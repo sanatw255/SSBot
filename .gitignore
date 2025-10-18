@@ -74,7 +74,7 @@ bower_components/
 # ──────────────────────────────
 #  Configs (Sensitive)
 # ──────────────────────────────
-src/config/*
+//src/config/*
 !src/config/example.json  # <- keep a safe example config file if you want
 
 # ──────────────────────────────
