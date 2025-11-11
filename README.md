@@ -1,6 +1,6 @@
 # Discord Bot
 
-A multipurpose modular Discord bot with 400+ features including moderation, music, games, AI chat, economy, and more.
+A multipurpose modular Discord bot with 400+ features including moderation, games, AI chat, economy, and more.
 
 ---
 
@@ -31,7 +31,6 @@ It has been significantly refactored, updated, and maintained by Sanat.
 ## ⚙️ Requirements
 
 - Node.js v17+
-- Java v13+ (for Lavalink server)
 - MongoDB URI – [MongoDB](https://cloud.mongodb.com/)
 - Discord Bot Token – [Discord Developer Portal](https://discord.com/developers/applications)
 - Giphy API Key – [Giphy](https://developers.giphy.com/)

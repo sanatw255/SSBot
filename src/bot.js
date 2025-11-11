@@ -73,7 +73,6 @@ if (process.env.WEBHOOK_ID && process.env.WEBHOOK_TOKEN) {
 }
 
 client.commands = new Discord.Collection();
-client.playerManager = new Map();
 client.queue = new Map();
 
 // Webhooks
