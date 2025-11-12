@@ -1,6 +1,9 @@
 const Discord = require("discord.js");
 
 module.exports = async (client, interaction, args) => {
+  // Skip if called during bot initialization (interaction is undefined)
+  if (!interaction || !interaction.customId) return;
+
   const customId = interaction.customId;
 
   if (customId === "Bot_createTicket") {

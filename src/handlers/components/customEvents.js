@@ -3,6 +3,9 @@ const Discord = require("discord.js");
 const ticketChannels = require("../../database/models/ticketChannels");
 
 module.exports = async (client, interaction, args) => {
+  // Skip if called during bot initialization (interaction is undefined)
+  if (!interaction) return;
+
   // Handle modal submissions
   if (interaction.isModalSubmit()) {
     if (interaction.customId === "ticketReasonModal") {

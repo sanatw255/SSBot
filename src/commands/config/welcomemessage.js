@@ -41,56 +41,74 @@ module.exports = async (client, interaction, args) => {
   }
 
   if (message.toUpperCase() == "DEFAULT") {
-    inviteMessages.findOne(
-      { Guild: interaction.guild.id },
-      async (err, data) => {
-        if (data) {
-          data.inviteJoin = null;
-          data.save();
-
-          client.succNormal(
-            {
-              text: `Welcome message deleted!`,
-              type: "editreply",
-            },
-            interaction
-          );
-        }
-      }
-    );
-  } else {
-    inviteMessages.findOne(
-      { Guild: interaction.guild.id },
-      async (err, data) => {
-        if (data) {
-          // Replace \n with actual line breaks
-          const processedMessage = message.replace(/\\n/g, "\n");
-          data.inviteJoin = processedMessage;
-          data.save();
-        } else {
-          // Replace \n with actual line breaks
-          const processedMessage = message.replace(/\\n/g, "\n");
-          new inviteMessages({
-            Guild: interaction.guild.id,
-            inviteJoin: processedMessage,
-          }).save();
-        }
+    try {
+      const data = await inviteMessages.findOne({
+        Guild: interaction.guild.id,
+      });
+      if (data) {
+        data.inviteJoin = null;
+        await data.save();
 
         client.succNormal(
           {
-            text: `The welcome message has been set successfully`,
-            fields: [
-              {
-                name: `💬┆Message`,
-                value: `${message}`,
-                inline: true,
-              },
-            ],
+            text: `Welcome message deleted!`,
             type: "editreply",
           },
           interaction
         );
       }
-    );
+    } catch (err) {
+      console.error("Error deleting welcome message:", err);
+      client.errNormal(
+        {
+          error: "An error occurred while deleting the welcome message.",
+          type: "editreply",
+        },
+        interaction
+      );
+    }
+  } else {
+    try {
+      const data = await inviteMessages.findOne({
+        Guild: interaction.guild.id,
+      });
+      if (data) {
+        // Replace \n with actual line breaks
+        const processedMessage = message.replace(/\\n/g, "\n");
+        data.inviteJoin = processedMessage;
+        await data.save();
+      } else {
+        // Replace \n with actual line breaks
+        const processedMessage = message.replace(/\\n/g, "\n");
+        await new inviteMessages({
+          Guild: interaction.guild.id,
+          inviteJoin: processedMessage,
+        }).save();
+      }
+
+      client.succNormal(
+        {
+          text: `The welcome message has been set successfully`,
+          fields: [
+            {
+              name: `💬┆Message`,
+              value: `${message}`,
+              inline: true,
+            },
+          ],
+          type: "editreply",
+        },
+        interaction
+      );
+    } catch (err) {
+      console.error("Error setting welcome message:", err);
+      client.errNormal(
+        {
+          error: "An error occurred while setting the welcome message.",
+          type: "editreply",
+        },
+        interaction
+      );
+    }
   }
 };

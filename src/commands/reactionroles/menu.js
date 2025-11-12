@@ -1,75 +1,105 @@
-const Discord = require('discord.js');
+const Discord = require("discord.js");
 
 const Schema = require("../../database/models/reactionRoles");
 
 module.exports = async (client, interaction, args) => {
-    const category = interaction.options.getString('category');
-    const channel = interaction.options.getChannel('channel') || interaction.channel;
+  const category = interaction.options.getString("category");
+  const channel =
+    interaction.options.getChannel("channel") || interaction.channel;
 
-    const lower = category.toLowerCase();
-    const upper = lower.charAt(0).toUpperCase() + lower.substring(1);
+  const lower = category.toLowerCase();
+  const upper = lower.charAt(0).toUpperCase() + lower.substring(1);
 
-    Schema.findOne({ Guild: interaction.guild.id, Category: category }, async (err, data) => {
-        if (!data) return client.errNormal({ 
-            error: `No data found!`,
-            type: 'editreply'
-        }, interaction);
+  try {
+    const data = await Schema.findOne({
+      Guild: interaction.guild.id,
+      Category: category,
+    });
 
-        const map = Object.keys(data.Roles)
-            .map((value, index) => {
-                const role = interaction.guild.roles.cache.get(data.Roles[value][0]);
-                if(!role) return;
+    if (!data)
+      return client.errNormal(
+        {
+          error: `No data found!`,
+          type: "editreply",
+        },
+        interaction
+      );
 
-                return `${data.Roles[value][1].raw} | ${role}`;
-            }).join("\n");
+    const map = Object.keys(data.Roles)
+      .map((value, index) => {
+        const role = interaction.guild.roles.cache.get(data.Roles[value][0]);
+        if (!role) return;
 
-        const menu = new Discord.StringSelectMenuBuilder()
-            .setCustomId('reaction_select')
-            .setPlaceholder('❌┇Nothing selected')
-            .setMinValues(1)
+        return `${data.Roles[value][1].raw} | ${role}`;
+      })
+      .join("\n");
 
-        var labels = [];
+    const menu = new Discord.StringSelectMenuBuilder()
+      .setCustomId("reaction_select")
+      .setPlaceholder("❌┇Nothing selected")
+      .setMinValues(1);
 
-        const mapped = Object.keys(data.Roles).map((value, index) => {
-            const role = interaction.guild.roles.cache.get(data.Roles[value][0]);
-            if(!role) return;
+    var labels = [];
 
-            const generated = {
-                label: `${role.name}`,
-                description: `Add or remove the role ${role.name}`,
-                emoji: data.Roles[value][1].raw,
-                value: data.Roles[value][1].raw,
-            }
+    const mapped = Object.keys(data.Roles)
+      .map((value, index) => {
+        const role = interaction.guild.roles.cache.get(data.Roles[value][0]);
+        if (!role) return;
 
-            return labels.push(generated);
-        }).join("\n");
+        const generated = {
+          label: `${role.name}`,
+          description: `Add or remove the role ${role.name}`,
+          emoji: data.Roles[value][1].raw,
+          value: data.Roles[value][1].raw,
+        };
 
-        await menu.addOptions(labels);
+        return labels.push(generated);
+      })
+      .join("\n");
 
-        const row = new Discord.ActionRowBuilder()
-            .addComponents(menu)
+    await menu.addOptions(labels);
 
-        client.embed({
-            title: `${upper}・Roles`,
-            desc: `_____ \n\nChoose your roles in the menu! \n\n${map}`,
-            components: [row]
-        }, channel).then(async(msg) => {
-            if(!msg){
-                client.errNormal({
-                    error: "I couldn't send the message!\nMake sure I have the correct permissions!",
-                    type: 'editreply'
-                }, interaction);
-                return;
-            }
-            data.Message = msg.id;
-            data.save();
-        })
+    const row = new Discord.ActionRowBuilder().addComponents(menu);
 
-        client.succNormal({ 
-            text: "Reaction panel successfully created!",
-            type: 'ephemeraledit'
-        }, interaction);
-    })
-}
+    const msg = await client.embed(
+      {
+        title: `${upper}・Roles`,
+        desc: `_____ \n\nChoose your roles in the menu! \n\n${map}`,
+        components: [row],
+      },
+      channel
+    );
 
- 
+    if (!msg) {
+      client.errNormal(
+        {
+          error:
+            "I couldn't send the message!\nMake sure I have the correct permissions!",
+          type: "editreply",
+        },
+        interaction
+      );
+      return;
+    }
+
+    data.Message = msg.id;
+    await data.save();
+
+    client.succNormal(
+      {
+        text: "Reaction panel successfully created!",
+        type: "ephemeraledit",
+      },
+      interaction
+    );
+  } catch (err) {
+    console.error("Error in reactionroles menu command:", err);
+    client.errNormal(
+      {
+        error: "An error occurred while creating the reaction menu.",
+        type: "editreply",
+      },
+      interaction
+    );
+  }
+};
