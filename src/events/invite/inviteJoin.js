@@ -36,43 +36,47 @@ module.exports = async (client, member, invite, inviter) => {
         member.guild.memberCount
       );
 
-      welcomeSchema.findOne(
-        { Guild: member.guild.id },
-        async (err, channelData) => {
-          if (channelData) {
-            var channel = member.guild.channels.cache.get(channelData.Channel);
+      try {
+        const channelData = await welcomeSchema.findOne({
+          Guild: member.guild.id,
+        });
+        if (channelData) {
+          var channel = member.guild.channels.cache.get(channelData.Channel);
 
-            await client
-              .embed(
-                {
-                  title: `👋・Welcome`,
-                  desc: joinMessage,
-                },
-                channel
-              )
-              .catch(() => {});
-          }
+          await client
+            .embed(
+              {
+                title: `👋・Welcome`,
+                desc: joinMessage,
+              },
+              channel
+            )
+            .catch(() => {});
         }
-      );
+      } catch (err) {
+        console.error("Error sending welcome message:", err);
+      }
     } else {
-      welcomeSchema.findOne(
-        { Guild: member.guild.id },
-        async (err, channelData) => {
-          if (channelData) {
-            var channel = member.guild.channels.cache.get(channelData.Channel);
+      try {
+        const channelData = await welcomeSchema.findOne({
+          Guild: member.guild.id,
+        });
+        if (channelData) {
+          var channel = member.guild.channels.cache.get(channelData.Channel);
 
-            client
-              .embed(
-                {
-                  title: `👋・Welcome`,
-                  desc: `I cannot trace how **${member} | ${member.user.tag}** has been joined`,
-                },
-                channel
-              )
-              .catch(() => {});
-          }
+          client
+            .embed(
+              {
+                title: `👋・Welcome`,
+                desc: `I cannot trace how **${member} | ${member.user.tag}** has been joined`,
+              },
+              channel
+            )
+            .catch(() => {});
         }
-      );
+      } catch (err) {
+        console.error("Error sending welcome message:", err);
+      }
     }
   } else {
     const data = await invites.findOne({
@@ -117,45 +121,45 @@ module.exports = async (client, member, invite, inviter) => {
           member.guild.memberCount
         );
 
-        welcomeSchema.findOne(
-          { Guild: member.guild.id },
-          async (err, channelData) => {
-            if (channelData) {
-              var channel = member.guild.channels.cache.get(
-                channelData.Channel
-              );
+        try {
+          const channelData = await welcomeSchema.findOne({
+            Guild: member.guild.id,
+          });
+          if (channelData) {
+            var channel = member.guild.channels.cache.get(channelData.Channel);
 
-              await client
-                .embed(
-                  {
-                    title: `👋・Welcome`,
-                    desc: joinMessage,
-                  },
-                  channel
-                )
-                .catch(() => {});
-            }
-          }
-        );
-      } else {
-        welcomeSchema.findOne(
-          { Guild: member.guild.id },
-          async (err, channelData) => {
-            if (channelData) {
-              var channel = member.guild.channels.cache.get(
-                channelData.Channel
-              );
-
-              client.embed(
+            await client
+              .embed(
                 {
                   title: `👋・Welcome`,
-                  desc: `**${member} | ${member.user.tag}** was invited by ${inviter.tag} **(${data.Invites} invites)**`,
+                  desc: joinMessage,
                 },
                 channel
-              );
-            }
+              )
+              .catch(() => {});
           }
-        );
+        } catch (err) {
+          console.error("Error sending welcome message:", err);
+        }
+      } else {
+        try {
+          const channelData = await welcomeSchema.findOne({
+            Guild: member.guild.id,
+          });
+          if (channelData) {
+            var channel = member.guild.channels.cache.get(channelData.Channel);
+
+            client.embed(
+              {
+                title: `👋・Welcome`,
+                desc: `**${member} | ${member.user.tag}** was invited by ${inviter.tag} **(${data.Invites} invites)**`,
+              },
+              channel
+            );
+          }
+        } catch (err) {
+          console.error("Error sending welcome message:", err);
+        }
       }
 
       try {
@@ -213,47 +217,47 @@ module.exports = async (client, member, invite, inviter) => {
           member.guild.memberCount
         );
 
-        welcomeSchema.findOne(
-          { Guild: member.guild.id },
-          async (err, channelData) => {
-            if (channelData) {
-              var channel = member.guild.channels.cache.get(
-                channelData.Channel
-              );
+        try {
+          const channelData = await welcomeSchema.findOne({
+            Guild: member.guild.id,
+          });
+          if (channelData) {
+            var channel = member.guild.channels.cache.get(channelData.Channel);
 
-              await client
-                .embed(
-                  {
-                    title: `👋・Welcome`,
-                    desc: joinMessage,
-                  },
-                  channel
-                )
-                .catch(() => {});
-            }
+            await client
+              .embed(
+                {
+                  title: `👋・Welcome`,
+                  desc: joinMessage,
+                },
+                channel
+              )
+              .catch(() => {});
           }
-        );
+        } catch (err) {
+          console.error("Error sending welcome message:", err);
+        }
       } else {
-        welcomeSchema.findOne(
-          { Guild: member.guild.id },
-          async (err, channelData) => {
-            if (channelData) {
-              var channel = member.guild.channels.cache.get(
-                channelData.Channel
-              );
+        try {
+          const channelData = await welcomeSchema.findOne({
+            Guild: member.guild.id,
+          });
+          if (channelData) {
+            var channel = member.guild.channels.cache.get(channelData.Channel);
 
-              await client
-                .embed(
-                  {
-                    title: `👋・Welcome`,
-                    desc: `**${member} | ${member.user.tag}** was invited by ${inviter.tag} **(1 invites)**`,
-                  },
-                  channel
-                )
-                .catch(() => {});
-            }
+            await client
+              .embed(
+                {
+                  title: `👋・Welcome`,
+                  desc: `**${member} | ${member.user.tag}** was invited by ${inviter.tag} **(1 invites)**`,
+                },
+                channel
+              )
+              .catch(() => {});
           }
-        );
+        } catch (err) {
+          console.error("Error sending welcome message:", err);
+        }
       }
     }
 
