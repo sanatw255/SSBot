@@ -31,7 +31,7 @@ module.exports = {
    */
 
   run: async (client, interaction, args) => {
-    await interaction.deferReply({ fetchReply: true });
+    await interaction.deferReply({ withResponse: true });
     try {
       const data = await model.findOne({ User: interaction.user.id });
       if (data && data.FLAGS.includes("DEVELOPER")) {

@@ -262,7 +262,7 @@ module.exports = (client) => {
                 embeds: embeds,
                 content: content,
                 components: components,
-                fetchReply: true
+                withResponse: true
             }).catch(e => { });
         }
         else if (type && type.toLowerCase() == "editreply") {
@@ -270,7 +270,7 @@ module.exports = (client) => {
                 embeds: embeds,
                 content: content,
                 components: components,
-                fetchReply: true
+                withResponse: true
             }).catch(e => { });
         }
         else if (type && type.toLowerCase() == "reply") {
@@ -278,7 +278,7 @@ module.exports = (client) => {
                 embeds: embeds,
                 content: content,
                 components: components,
-                fetchReply: true
+                withResponse: true
             }).catch(e => { });
         }
         else if (type && type.toLowerCase() == "update") {
@@ -286,7 +286,7 @@ module.exports = (client) => {
                 embeds: embeds,
                 content: content,
                 components: components,
-                fetchReply: true
+                withResponse: true
             }).catch(e => { });
         }
         else if (type && type.toLowerCase() == "ephemeraledit") {
@@ -294,7 +294,7 @@ module.exports = (client) => {
                 embeds: embeds,
                 content: content,
                 components: components,
-                fetchReply: true,
+                withResponse: true,
                 ephemeral: true
             }).catch(e => { });
         }
@@ -303,7 +303,7 @@ module.exports = (client) => {
                 embeds: embeds,
                 content: content,
                 components: components,
-                fetchReply: true,
+                withResponse: true,
                 ephemeral: true
             }).catch(e => { });
         }
@@ -312,7 +312,7 @@ module.exports = (client) => {
                 embeds: embeds,
                 content: content,
                 components: components,
-                fetchReply: true
+                withResponse: true
             }).catch(e => { });
         }
     }

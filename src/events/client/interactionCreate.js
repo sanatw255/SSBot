@@ -425,7 +425,7 @@ module.exports = async (client, interaction) => {
           name: "captcha.jpeg",
         });
 
-        interaction.reply({ files: [image], fetchReply: true }).then((msg) => {
+        interaction.reply({ files: [image], withResponse: true }).then((msg) => {
           const filter = (s) => s.author.id == interaction.user.id;
 
           interaction.channel

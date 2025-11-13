@@ -34,7 +34,7 @@ module.exports = {
      */
 
     run: async (client, interaction, args) => {
-        await interaction.deferReply({ fetchReply: true });
+        await interaction.deferReply({ withResponse: true });
         const activity = interaction.options.getString('activity');
 
         const channel = interaction.member.voice.channel;

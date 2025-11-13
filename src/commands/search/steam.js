@@ -2,7 +2,7 @@ const Discord = require('discord.js');
 const pop = require("popcat-wrapper");
 
 module.exports = async (client, interaction, args) => {
-    await interaction.deferReply({ fetchReply: true });
+    await interaction.deferReply({ withResponse: true });
 
     const name = interaction.options.getString('name');
 
