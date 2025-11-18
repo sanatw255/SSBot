@@ -126,6 +126,8 @@ module.exports = async (client, message) => {
               coinsEarned += pvcConfigData.Milestone100 || 100000;
             } else if (user.level % 50 === 0) {
               coinsEarned += pvcConfigData.Milestone50 || 25000;
+            } else if (user.level === 25) {
+              coinsEarned += 12500; // Hardcoded Level 25 bonus
             } else if (user.level % 10 === 0) {
               coinsEarned += pvcConfigData.Milestone10 || 5000;
             }
