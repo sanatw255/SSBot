@@ -103,7 +103,7 @@ fs.readdirSync("./src/handlers")
   });
 
 // Initialize PVC Timer System
-client.once("ready", () => {
+client.once("clientReady", () => {
   require("./handlers/pvc/timer")(client);
 });
 
