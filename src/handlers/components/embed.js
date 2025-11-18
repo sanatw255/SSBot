@@ -369,7 +369,7 @@ module.exports = (client) => {
         .catch((e) => {});
     } else {
       return await interaction
-        .send({
+        .reply({
           embeds: embeds,
           content: content,
           components: components,
