@@ -2,7 +2,8 @@ const mongoose = require("mongoose");
 
 const Schema = new mongoose.Schema({
   Guild: { type: String, required: true, unique: true },
-  EconomyChannel: { type: String, default: null }, // Channel ID where economy commands work
+  EconomyChannel: { type: String, default: null }, // Channel ID where economy commands work (!work, !daily, !bal, !give)
+  CommandsChannel: { type: String, default: null }, // Channel ID where VC management commands work (!create, !extend, !rename, etc.)
   PanelChannel: { type: String, default: null }, // Channel ID where control panel is posted
   WorkCooldown: { type: Number, default: 600000 }, // 10 minutes in ms
   WorkMin: { type: Number, default: 1000 },

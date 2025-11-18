@@ -10,16 +10,17 @@ module.exports = async (client, interaction, args) => {
       config = await new pvcConfig({ Guild: interaction.guild.id }).save();
     }
 
-    config.EconomyChannel = channel.id;
+    config.CommandsChannel = channel.id;
     await config.save();
 
     return client.succNormal(
       {
-        text: `PVC economy channel has been set to ${channel}!`,
+        text: `PVC commands channel has been set to ${channel}!`,
         fields: [
           {
             name: "📝 Commands Available",
-            value: "`!work`, `!daily`, `!bal`, `!give`",
+            value:
+              "`!create`, `!extend`, `!rename`, `!delete`, `!transfer`, `!vi`, `!vui`",
           },
         ],
         type: "editreply",
@@ -27,7 +28,7 @@ module.exports = async (client, interaction, args) => {
       interaction
     );
   } catch (err) {
-    console.error("Error in pvc-economy-channel config:", err);
+    console.error("Error in pvc-commands-channel config:", err);
     return client.errNormal(
       {
         error: "An error occurred while updating configuration!",

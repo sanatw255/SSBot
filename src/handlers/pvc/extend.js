@@ -8,8 +8,8 @@ module.exports = async (client, message, args) => {
 
   try {
     const config = await pvcConfig.findOne({ Guild: message.guild.id });
-    if (!config || !config.EconomyChannel) return;
-    if (message.channel.id !== config.EconomyChannel) return;
+    if (!config || !config.CommandsChannel) return;
+    if (message.channel.id !== config.CommandsChannel) return;
 
     // Get user's active VC
     const vcData = await voiceChannels.findOne({

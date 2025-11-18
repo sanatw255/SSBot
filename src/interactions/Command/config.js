@@ -130,11 +130,27 @@ module.exports = {
     .addSubcommand((subcommand) =>
       subcommand
         .setName("pvc-economy-channel")
-        .setDescription("Set the channel where PVC economy commands work")
+        .setDescription(
+          "Set the channel where PVC economy commands work (!work, !daily, !bal, !give)"
+        )
         .addChannelOption((option) =>
           option
             .setName("channel")
             .setDescription("The channel for PVC economy commands")
+            .setRequired(true)
+            .addChannelTypes(ChannelType.GuildText)
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName("pvc-commands-channel")
+        .setDescription(
+          "Set the channel where PVC management commands work (!create, !extend, !rename, etc.)"
+        )
+        .addChannelOption((option) =>
+          option
+            .setName("channel")
+            .setDescription("The channel for PVC management commands")
             .setRequired(true)
             .addChannelTypes(ChannelType.GuildText)
         )

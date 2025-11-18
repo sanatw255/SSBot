@@ -9,15 +9,15 @@ module.exports = async (client, message, args) => {
   if (message.author.bot) return;
 
   try {
-    // Check if PVC economy is configured
+    // Check if PVC commands channel is configured
     const config = await pvcConfig.findOne({ Guild: message.guild.id });
 
-    if (!config || !config.EconomyChannel) {
+    if (!config || !config.CommandsChannel) {
       return; // Silently ignore if not configured
     }
 
     // Check if command is in the correct channel
-    if (message.channel.id !== config.EconomyChannel) {
+    if (message.channel.id !== config.CommandsChannel) {
       return; // Silently ignore if wrong channel
     }
 

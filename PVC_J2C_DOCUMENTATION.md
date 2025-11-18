@@ -183,6 +183,8 @@ All economy commands work in the designated economy channel only.
 
 ### Voice Channel Management
 
+All voice channel management commands work in the designated VC commands channel only.
+
 #### Creating VCs
 
 **Paid VC (Fixed Duration):**
@@ -325,9 +327,17 @@ All configuration is done via slash commands: `/config <subcommand>`
 /config pvc-economy-channel channel:#channel
 ```
 
-**Sets where all economy commands work.**
+**Sets where all economy commands work** (!work, !daily, !bal, !give).
 
-#### 2. Set Work Cooldown
+#### 2. Set VC Commands Channel
+
+```
+/config pvc-commands-channel channel:#channel
+```
+
+**Sets where all voice channel management commands work** (!create, !extend, !rename, !delete, !transfer, !vi, !vui).
+
+#### 3. Set Work Cooldown
 
 ```
 /config pvc-work-cooldown minutes:10
@@ -336,7 +346,7 @@ All configuration is done via slash commands: `/config <subcommand>`
 - **Range**: 1-60 minutes
 - **Default**: 10 minutes
 
-#### 3. Set Pricing
+#### 4. Set Pricing
 
 ```
 /config pvc-pricing coins:3600
@@ -346,7 +356,7 @@ All configuration is done via slash commands: `/config <subcommand>`
 - **Default**: 3600 coins/hour
 - **Auto-calculates**: PAYG rate (hourly ÷ 60)
 
-#### 4. Set Work Rewards
+#### 5. Set Work Rewards
 
 ```
 /config pvc-work-rewards minimum:1000 maximum:3000
@@ -355,7 +365,7 @@ All configuration is done via slash commands: `/config <subcommand>`
 - **Minimum**: At least 100 coins
 - **Sets**: Random reward range for `!work`
 
-#### 5. Set Daily Rewards
+#### 6. Set Daily Rewards
 
 ```
 /config pvc-daily-rewards minimum:500 maximum:1500
@@ -364,7 +374,7 @@ All configuration is done via slash commands: `/config <subcommand>`
 - **Minimum**: At least 100 coins
 - **Sets**: Random reward range for `!daily`
 
-#### 6. Set Level Rewards
+#### 7. Set Level Rewards
 
 ```
 /config pvc-level-rewards type:base amount:1000
@@ -380,7 +390,7 @@ All configuration is done via slash commands: `/config <subcommand>`
 - `milestone50` - Level 50 only
 - `milestone100` - Levels 100, 200, 300...
 
-#### 7. View Configuration
+#### 8. View Configuration
 
 ```
 /config pvc-view
@@ -388,7 +398,7 @@ All configuration is done via slash commands: `/config <subcommand>`
 
 Shows all current PVC settings.
 
-#### 8. Setup Control Panel
+#### 9. Setup Control Panel
 
 ```
 /config pvc-panel channel:#channel
@@ -426,7 +436,8 @@ Stores server PVC configuration.
 ```javascript
 {
   Guild: String,              // Server ID
-  EconomyChannel: String,     // Channel for economy commands
+  EconomyChannel: String,     // Channel ID for economy commands (!work, !daily, !bal, !give)
+  CommandsChannel: String,    // Channel ID for VC management (!create, !extend, !rename, etc.)
   PanelChannel: String,       // Channel for control panel
   WorkCooldown: Number,       // Cooldown in ms (default: 600000)
   WorkMin: Number,            // Min work reward (default: 1000)
@@ -487,12 +498,20 @@ This creates:
 #### 1.2 Configure Economy Channel
 
 ```
-/config pvc-economy-channel channel:#economy
+/config pvc-economy-channel channel:#pvc-economy
 ```
 
-Replace `#economy` with your desired channel.
+This channel will allow users to use: `!work`, `!daily`, `!bal`, `!give`
 
-#### 1.3 (Optional) Setup Control Panel
+#### 1.3 Configure VC Commands Channel
+
+```
+/config pvc-commands-channel channel:#pvc-commands
+```
+
+This channel will allow users to use: `!create`, `!extend`, `!rename`, `!delete`, `!transfer`, `!vi`, `!vui`
+
+#### 1.4 (Optional) Setup Control Panel
 
 ```
 /config pvc-panel channel:#pvc-control

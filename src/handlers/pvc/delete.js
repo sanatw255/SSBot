@@ -6,6 +6,7 @@ module.exports = async (client, message, args) => {
   if (message.author.bot) return;
 
   try {
+    // Delete can be used in any channel
     const vcData = await voiceChannels.findOne({
       Guild: message.guild.id,
       Owner: message.author.id,

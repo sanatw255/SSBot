@@ -9,13 +9,21 @@ module.exports = async (client, message, args) => {
     const config = await pvcConfig.findOne({ Guild: message.guild.id });
     if (!config) return;
 
+    // Check if in commands channel
+    if (
+      config.CommandsChannel &&
+      message.channel.id !== config.CommandsChannel
+    ) {
+      return; // Silently ignore if wrong channel
+    }
+
     const vcData = await voiceChannels.findOne({
       Guild: message.guild.id,
       Owner: message.author.id,
     });
 
     if (!vcData) {
-      if (message.channel.id === config.EconomyChannel) {
+      if (message.channel.id === config.CommandsChannel) {
         const embed = new Discord.EmbedBuilder()
           .setColor("#FF0000")
           .setTitle("❌ No Active VC")

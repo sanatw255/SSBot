@@ -11,13 +11,18 @@ module.exports = async (client, interaction, args) => {
     const economyChannel = config.EconomyChannel
       ? `<#${config.EconomyChannel}>`
       : "Not configured";
+    const commandsChannel = config.CommandsChannel
+      ? `<#${config.CommandsChannel}>`
+      : "Not configured";
     const workCooldownMin = Math.floor(config.WorkCooldown / 60000);
 
     const embed = new Discord.EmbedBuilder()
       .setTitle("⚙️ PVC Configuration")
       .setColor(client.config.colors.normal)
       .addFields(
-        { name: "💬 Economy Channel", value: economyChannel, inline: false },
+        { name: "💬 Economy Channel", value: economyChannel, inline: true },
+        { name: "🔧 Commands Channel", value: commandsChannel, inline: true },
+        { name: "\u200b", value: "\u200b", inline: false },
         {
           name: "💰 Hourly Price",
           value: `${config.HourlyPrice.toLocaleString()} coins`,
