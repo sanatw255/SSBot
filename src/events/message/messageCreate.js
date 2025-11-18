@@ -13,6 +13,11 @@ const Commands = require("../../database/models/customCommand");
 const CommandsSchema = require("../../database/models/customCommandAdvanced");
 const fetch = require("node-fetch");
 
+// PVC Commands Handler
+const pvcCommandsHandler = require("./pvcCommands");
+const pvcConfig = require("../../database/models/pvcConfig");
+const pvcEconomy = require("../../database/models/pvcEconomy");
+
 /**
  * @param {Discord.Client} client
  * @param {Discord.Message} message
@@ -24,6 +29,28 @@ module.exports = async (client, message) => {
   });
 
   if (message.author.bot) return;
+
+  // Auto-delete messages in PVC panel channel (except the panel itself)
+  if (message.guild) {
+    try {
+      const config = await pvcConfig.findOne({ Guild: message.guild.id });
+      if (
+        config &&
+        config.PanelChannel &&
+        message.channel.id === config.PanelChannel
+      ) {
+        await message.delete().catch(() => {});
+        return; // Stop processing this message
+      }
+    } catch (error) {
+      console.error("Error in PVC panel auto-delete:", error);
+    }
+  }
+
+  // Handle PVC prefix commands (!work, !daily, !bal, !give, etc.)
+  if (message.guild) {
+    await pvcCommandsHandler(client, message);
+  }
 
   // DM Logging
   if (message.channel.type === Discord.ChannelType.DM) {
@@ -84,6 +111,47 @@ module.exports = async (client, message) => {
             message.author.id,
             message.guild.id
           );
+
+          // PVC Level-Up Rewards System
+          let coinsEarned = 0;
+          const pvcConfigData = await pvcConfig.findOne({
+            Guild: message.guild.id,
+          });
+          if (pvcConfigData && pvcConfigData.LevelRewardsEnabled) {
+            // Calculate base reward
+            coinsEarned = pvcConfigData.BaseLevelReward || 1000;
+
+            // Add milestone bonuses (check larger milestones first)
+            if (user.level % 100 === 0) {
+              coinsEarned += pvcConfigData.Milestone100 || 100000;
+            } else if (user.level % 50 === 0) {
+              coinsEarned += pvcConfigData.Milestone50 || 25000;
+            } else if (user.level % 10 === 0) {
+              coinsEarned += pvcConfigData.Milestone10 || 5000;
+            }
+
+            // Award coins to user
+            let userEconomy = await pvcEconomy.findOne({
+              Guild: message.guild.id,
+              User: message.author.id,
+            });
+
+            if (!userEconomy) {
+              userEconomy = new pvcEconomy({
+                Guild: message.guild.id,
+                User: message.author.id,
+                Coins: coinsEarned,
+              });
+            } else {
+              userEconomy.Coins += coinsEarned;
+            }
+
+            await userEconomy.save();
+            console.log(
+              `[PVC Rewards] ${message.author.tag} earned ${coinsEarned} coins for reaching level ${user.level}`
+            );
+          }
+
           const levelLogData = await levelLogs.findOne({
             Guild: message.guild.id,
           });
@@ -102,6 +170,17 @@ module.exports = async (client, message) => {
                 .replace(`{user:level}`, user.level)
                 .replace(`{user:xp}`, user.xp)
             : `**GG** <@!${message.author.id}>, you are now level **${user.level}**`;
+
+          // Add PVC coin reward info to level message
+          if (coinsEarned > 0) {
+            const isMilestone =
+              user.level % 100 === 0 ||
+              user.level % 50 === 0 ||
+              user.level % 10 === 0;
+            const coinEmoji = isMilestone ? "🎉🪙" : "🪙";
+            levelMessage += `\n${coinEmoji} **+${coinsEarned.toLocaleString()} PVC Coins!**`;
+            levelMessage += `\n💰 **New Balance: ${userEconomy.Coins.toLocaleString()} coins**`;
+          }
 
           try {
             if (levelLogData?.Channel) {

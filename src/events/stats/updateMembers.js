@@ -3,6 +3,12 @@ const Schema = require("../../database/models/stats");
 
 module.exports = async (client, member) => {
   try {
+    // Validate member object
+    if (!member || !member.guild) {
+      console.error("Invalid member object in updateMembers");
+      return;
+    }
+
     const guild = member.guild;
 
     const data = await Schema.findOne({ Guild: guild.id });

@@ -91,6 +91,7 @@ fs.readdirSync("./src/handlers")
   .filter(
     (dir) =>
       !dir.startsWith(".") &&
+      dir !== "pvc" && // Exclude PVC handlers (they're message handlers, not loaders)
       fs.lstatSync(`./src/handlers/${dir}`).isDirectory()
   )
   .forEach((dir) => {
@@ -100,6 +101,11 @@ fs.readdirSync("./src/handlers")
         require(`./handlers/${dir}/${handler}`)(client);
       });
   });
+
+// Initialize PVC Timer System
+client.once("ready", () => {
+  require("./handlers/pvc/timer")(client);
+});
 
 // Login
 client.login(process.env.DISCORD_TOKEN);

@@ -13,6 +13,15 @@ const ticketMessageConfig = require("../../database/models/ticketMessage");
 module.exports = async (client, interaction) => {
   // Handle modal submissions FIRST
   if (interaction.isModalSubmit()) {
+    // Handle PVC modals first
+    if (
+      interaction.customId.startsWith("pvc") &&
+      interaction.customId.endsWith("Modal")
+    ) {
+      const pvcModalHandler = require("../../handlers/components/pvcModals");
+      return await pvcModalHandler(client, interaction);
+    }
+
     if (interaction.customId === "ticketReasonModal") {
       try {
         const reason = interaction.fields.getTextInputValue("ticketReason");
@@ -425,41 +434,43 @@ module.exports = async (client, interaction) => {
           name: "captcha.jpeg",
         });
 
-        interaction.reply({ files: [image], withResponse: true }).then((msg) => {
-          const filter = (s) => s.author.id == interaction.user.id;
+        interaction
+          .reply({ files: [image], withResponse: true })
+          .then((msg) => {
+            const filter = (s) => s.author.id == interaction.user.id;
 
-          interaction.channel
-            .awaitMessages({ filter, max: 1 })
-            .then((response) => {
-              if (response.first().content === captcha.value) {
-                response.first().delete();
-                msg.delete();
+            interaction.channel
+              .awaitMessages({ filter, max: 1 })
+              .then((response) => {
+                if (response.first().content === captcha.value) {
+                  response.first().delete();
+                  msg.delete();
 
-                interaction.user
-                  .send("✅ You have been successfully verified!")
-                  .catch(() => {});
+                  interaction.user
+                    .send("✅ You have been successfully verified!")
+                    .catch(() => {});
 
-                var verifyUser = interaction.guild.members.cache.get(
-                  interaction.user.id
-                );
-                verifyUser.roles.add(data.Role);
-              } else {
-                response.first().delete();
-                msg.delete();
+                  var verifyUser = interaction.guild.members.cache.get(
+                    interaction.user.id
+                  );
+                  verifyUser.roles.add(data.Role);
+                } else {
+                  response.first().delete();
+                  msg.delete();
 
-                interaction
-                  .followUp({
-                    content: "❌ You have answered the captcha incorrectly!",
-                    ephemeral: true,
-                  })
-                  .then((msgError) => {
-                    setTimeout(() => {
-                      msgError.delete().catch(() => {});
-                    }, 2000);
-                  });
-              }
-            });
-        });
+                  interaction
+                    .followUp({
+                      content: "❌ You have answered the captcha incorrectly!",
+                      ephemeral: true,
+                    })
+                    .then((msgError) => {
+                      setTimeout(() => {
+                        msgError.delete().catch(() => {});
+                      }, 2000);
+                    });
+                }
+              });
+          });
       } catch (error) {
         console.log(error);
       }
@@ -506,6 +517,12 @@ module.exports = async (client, interaction) => {
 
   // Reaction roles button
   if (interaction.isButton()) {
+    // Handle PVC buttons first
+    if (interaction.customId.startsWith("pvc_")) {
+      const pvcButtonHandler = require("../../handlers/components/pvcButtons");
+      return await pvcButtonHandler(client, interaction);
+    }
+
     var buttonID = interaction.customId.split("-");
 
     if (buttonID[0] == "reaction_button") {
@@ -546,6 +563,7 @@ module.exports = async (client, interaction) => {
 
   // Reaction roles select
   if (interaction.isStringSelectMenu()) {
+    // Handle reaction roles select
     if (interaction.customId == "reaction_select") {
       try {
         const data = await reactionSchema.findOne({

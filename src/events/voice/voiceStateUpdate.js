@@ -114,33 +114,87 @@ module.exports = async (client, oldState, newState) => {
           }
           await data.save();
 
-          let channelName = data.ChannelName;
-          channelName = channelName.replace(`{emoji}`, "🔊");
-          channelName = channelName.replace(
-            `{channel name}`,
-            `Voice ${data.ChannelCount}`
-          );
-          channelName = channelName.replace(
-            `{channel count}`,
-            `${data.ChannelCount}`
-          );
-          channelName = channelName.replace(`{member}`, `${user.username}`);
-          channelName = channelName.replace(`{member tag}`, `${user.tag}`);
+          // Use user's name for PAYG VCs (like !create command)
+          const channelName = `${user.username}'s VC`;
 
           const channel = await newState.guild.channels.create({
             name: "⌛",
             type: Discord.ChannelType.GuildVoice,
             parent: data.Category,
+            permissionOverwrites: [
+              {
+                id: newState.guild.id, // @everyone
+                deny: [Discord.PermissionFlagsBits.Connect],
+              },
+              {
+                id: newState.id, // Channel owner
+                allow: [
+                  Discord.PermissionFlagsBits.Connect,
+                  Discord.PermissionFlagsBits.Speak,
+                  Discord.PermissionFlagsBits.Stream,
+                  Discord.PermissionFlagsBits.ManageChannels,
+                ],
+              },
+            ],
           });
 
           if (member.voice.setChannel(channel)) {
             await channel.edit({ name: channelName });
           }
 
+          // Get PVC config for PAYG rate
+          const pvcConfig = require("../../database/models/pvcConfig");
+          const config = await pvcConfig.findOne({ Guild: guildID });
+          const paygRate = config?.PAYGPerMinute || 60; // Default 60 coins/min
+
+          // Create PAYG voice channel
           await new channelSchema({
             Guild: guildID,
             Channel: channel.id,
+            Owner: newState.id,
+            CreatedAt: new Date(),
+            IsPAYG: true, // Enable PAYG mode for J2C
+            ActiveSince: new Date(), // Track when user joined
+            IsLocked: true, // Locked by default
+            IsHidden: false,
+            InvitedUsers: [],
+            PaidDuration: 0,
+            CoinsSpent: 0,
           }).save();
+
+          // Send PAYG welcome message
+          try {
+            const embed = new Discord.EmbedBuilder()
+              .setColor("#00BFFF")
+              .setTitle("🎙️ Pay-As-You-Go Voice Channel")
+              .setDescription(
+                `Welcome to your temporary voice channel!\n\n` +
+                  `**How it works:**\n` +
+                  `• You're charged **${paygRate} coins per minute** while in the VC\n` +
+                  `• Billing starts now and charges every 60 seconds\n` +
+                  `• The channel will be deleted when you leave\n` +
+                  `• If your balance runs out, you'll get a warning before deletion\n\n` +
+                  `**Controls:**\n` +
+                  `• Use the control panel in ${
+                    config?.PanelChannel
+                      ? `<#${config.PanelChannel}>`
+                      : "the PVC channel"
+                  } to manage your VC\n` +
+                  `• Invite/Uninvite users, rename, lock/unlock, etc.\n\n` +
+                  `💡 **Tip:** Check your balance with \`!bal\` in <#${
+                    config?.EconomyChannel || "the economy channel"
+                  }>`
+              )
+              .setFooter({ text: "Enjoy your session!" })
+              .setTimestamp();
+
+            await member.send({ embeds: [embed] }).catch(() => {
+              // If DM fails, try sending in the VC (but it won't work in voice channels)
+              // Just silently fail
+            });
+          } catch (error) {
+            console.error("Error sending PAYG welcome message:", error);
+          }
         } else {
           // User moved to different channel
           const oldChannelData = await channelSchema.findOne({
