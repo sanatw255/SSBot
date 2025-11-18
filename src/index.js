@@ -5,7 +5,7 @@ const axios = require("axios");
 // Check if is up to date
 const { version } = require(".././package.json");
 axios
-  .get("https://api.github.com/repos/CorwinDev/Discord-Bot/releases/latest")
+  .get("https://api.github.com/repos/sanatw255/SSBot/releases/latest")
   .then((res) => {
     if (res.data.tag_name !== version) {
       console.log(

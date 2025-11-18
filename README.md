@@ -44,8 +44,8 @@ It has been significantly refactored, updated, and maintained by Sanat.
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-username/Discord-Bot.git
-cd Discord-Bot
+git clone https://github.com/sanatw255/SSBot.git
+cd SSBot
 ```
 
 ### 2. Configure Environment Variables
