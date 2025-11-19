@@ -80,6 +80,60 @@ module.exports = {
     )
     .addSubcommand((subcommand) =>
       subcommand
+        .setName("voicexp")
+        .setDescription("Configure voice channel XP settings")
+        .addStringOption((option) =>
+          option
+            .setName("setting")
+            .setDescription("Setting to configure")
+            .setRequired(true)
+            .addChoices(
+              { name: "Enable/Disable", value: "enabled" },
+              { name: "XP Amount", value: "xpamount" },
+              { name: "Interval (minutes)", value: "interval" },
+              { name: "AFK Detection", value: "afkdetection" },
+              { name: "Minimum Users", value: "minimumusers" },
+              { name: "View Settings", value: "view" }
+            )
+        )
+        .addIntegerOption((option) =>
+          option
+            .setName("amount")
+            .setDescription("Value for XP amount, interval, or minimum users")
+            .setMinValue(1)
+            .setMaxValue(60)
+        )
+        .addBooleanOption((option) =>
+          option
+            .setName("enabled")
+            .setDescription("Value for enabled or AFK detection (true/false)")
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName("voicexpchannels")
+        .setDescription("Manage voice channels/categories that grant XP")
+        .addStringOption((option) =>
+          option
+            .setName("action")
+            .setDescription("Action to perform")
+            .setRequired(true)
+            .addChoices(
+              { name: "Add Channel/Category", value: "add" },
+              { name: "Remove Channel/Category", value: "remove" },
+              { name: "List Channels", value: "list" },
+              { name: "Clear All (allow all VCs)", value: "clear" }
+            )
+        )
+        .addChannelOption((option) =>
+          option
+            .setName("channel")
+            .setDescription("Voice channel or category (not needed for list/clear)")
+            .addChannelTypes(Discord.ChannelType.GuildVoice, Discord.ChannelType.GuildCategory)
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
         .setName("setcolor")
         .setDescription("Set a custom embed color")
         .addStringOption((option) =>
