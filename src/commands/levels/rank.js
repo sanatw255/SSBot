@@ -32,7 +32,7 @@ module.exports = async (client, interaction, args) => {
         .setLevel(user.level)
         .setProgressBar(client.config.colors.normal, "COLOR")
         .setUsername(target.username)
-        .setDiscriminator(target.discriminator)
+        .setDiscriminator(target.discriminator || "0")
         .setStatus("dnd")
         .setRank(user.position);
 
