@@ -34,6 +34,7 @@ module.exports = async (client, interaction, args) => {
           title: `🎁 Level Rewards`,
           desc: embed_desc,
           color: client.config.colors.normal,
+          type: "editreply",
         },
         interaction
       );
