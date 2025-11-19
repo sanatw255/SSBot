@@ -25,6 +25,29 @@ module.exports = {
     )
     .addSubcommand((subcommand) =>
       subcommand
+        .setName("levelchannels")
+        .setDescription("Manage channels where XP is earned")
+        .addStringOption((option) =>
+          option
+            .setName("action")
+            .setDescription("Action to perform")
+            .setRequired(true)
+            .addChoices(
+              { name: "Add Channel", value: "add" },
+              { name: "Remove Channel", value: "remove" },
+              { name: "List Channels", value: "list" },
+              { name: "Clear All (allow all channels)", value: "clear" }
+            )
+        )
+        .addChannelOption((option) =>
+          option
+            .setName("channel")
+            .setDescription("Channel to add/remove (not needed for list/clear)")
+            .addChannelTypes(ChannelType.GuildText)
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
         .setName("setcolor")
         .setDescription("Set a custom embed color")
         .addStringOption((option) =>
