@@ -1,7 +1,40 @@
 # 🔍 SSBot - Action Plan (Updated)
 
-**Last Updated**: November 18, 2025  
+**Last Updated**: November 19, 2025  
 **Bot Version**: 10.0.0
+
+---
+
+## 🚨 PRIORITY FOR NEXT SESSION (Nov 20, 2025)
+
+### **Fix & Verify Level System**
+
+**Current Issues:**
+
+- `/levels rank` was showing `interaction.send()` error - **FIXED** (changed to `interaction.reply()`)
+- Level system needs full testing to ensure everything works
+
+**Tasks to Complete:**
+
+1. Enable levels: `/config levels boolean:True`
+2. Test `/levels rank` - verify rank card displays
+3. Test `/levels leaderboard`
+4. Test `/levels createreward level:X role:@Role`
+5. Test level-up XP gain and rewards
+6. Verify PVC coin rewards on level-up:
+   - Every level: 1,000 coins
+   - Levels 10,20,30...: 6,000 coins (1k base + 5k milestone)
+   - **Level 25: 13,500 coins** (1k base + 12.5k bonus) - HARDCODED
+   - Level 50: 31,000 coins (1k + 5k + 25k)
+   - Levels 100,200...: 106,000 coins (1k + 5k + 100k)
+
+**Files Modified Today:**
+
+- `src/handlers/components/embed.js` - Fixed interaction.send() bug
+- `src/events/message/messageCreate.js` - Added level 25 bonus
+- `src/handlers/pvc/` - Enhanced coin commands with role support
+
+**Note:** GitHub had 500 errors, changes not pushed yet. Push when GitHub is back online.
 
 ---
 
@@ -154,8 +187,6 @@ axios.get("https://api.github.com/repos/CorwinDev/Discord-Bot/releases/latest");
 - Update version check to correct repository
 
 ---
-
-
 
 ---
 
