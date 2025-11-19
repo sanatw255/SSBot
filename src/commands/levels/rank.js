@@ -1,5 +1,5 @@
 const Discord = require("discord.js");
-const Canvacord = require("canvacord");
+const { RankCardBuilder, Font } = require("canvacord");
 const Functions = require("../../database/models/functions");
 const Schema = require("../../database/models/levels");
 
@@ -23,20 +23,22 @@ module.exports = async (client, interaction, args) => {
 
       const xpRequired = client.xpFor(user.level + 1);
 
-      const rankCard = new Canvacord.Rank()
+      // Load fonts (required for Canvacord v6)
+      Font.loadDefault();
+
+      const rankCard = new RankCardBuilder()
+        .setDisplayName(target.username)
+        .setUsername(`@${target.username}`)
         .setAvatar(
           target.displayAvatarURL({ dynamic: false, extension: "png" })
         )
-        .setRequiredXP(xpRequired)
         .setCurrentXP(user.xp)
+        .setRequiredXP(xpRequired)
         .setLevel(user.level)
-        .setProgressBar(client.config.colors.normal, "COLOR")
-        .setUsername(target.username)
-        .setDiscriminator(target.discriminator || "0")
-        .setStatus("dnd")
-        .setRank(user.position);
+        .setRank(user.position)
+        .setStatus("dnd");
 
-      const rankImage = await rankCard.build();
+      const rankImage = await rankCard.build({ format: "png" });
       const attachment = new Discord.AttachmentBuilder(rankImage, {
         name: "RankCard.png",
       });
