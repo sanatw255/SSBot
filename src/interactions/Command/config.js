@@ -128,8 +128,13 @@ module.exports = {
         .addChannelOption((option) =>
           option
             .setName("channel")
-            .setDescription("Voice channel or category (not needed for list/clear)")
-            .addChannelTypes(Discord.ChannelType.GuildVoice, Discord.ChannelType.GuildCategory)
+            .setDescription(
+              "Voice channel or category (not needed for list/clear)"
+            )
+            .addChannelTypes(
+              Discord.ChannelType.GuildVoice,
+              Discord.ChannelType.GuildCategory
+            )
         )
     )
     .addSubcommand((subcommand) =>

@@ -27,21 +27,31 @@ module.exports = async (client, oldState, newState) => {
 
     // User left voice channel
     if (oldState.channelId && !newState.channelId) {
-      console.log(`[VoiceXP] ${newState.member.user.username} left voice channel`);
+      console.log(
+        `[VoiceXP] ${newState.member.user.username} left voice channel`
+      );
       stopTracking(trackingKey);
       return;
     }
 
     // User joined voice channel
     if (!oldState.channelId && newState.channelId) {
-      console.log(`[VoiceXP] ${newState.member.user.username} joined voice channel ${newState.channel.name}`);
+      console.log(
+        `[VoiceXP] ${newState.member.user.username} joined voice channel ${newState.channel.name}`
+      );
       await startTracking(client, newState, voiceConfig, trackingKey);
       return;
     }
 
     // User switched channels
-    if (oldState.channelId && newState.channelId && oldState.channelId !== newState.channelId) {
-      console.log(`[VoiceXP] ${newState.member.user.username} switched voice channels`);
+    if (
+      oldState.channelId &&
+      newState.channelId &&
+      oldState.channelId !== newState.channelId
+    ) {
+      console.log(
+        `[VoiceXP] ${newState.member.user.username} switched voice channels`
+      );
       stopTracking(trackingKey);
       await startTracking(client, newState, voiceConfig, trackingKey);
       return;
@@ -53,10 +63,14 @@ module.exports = async (client, oldState, newState) => {
       const isAFK = newState.selfDeaf || newState.selfMute;
 
       if (!wasAFK && isAFK) {
-        console.log(`[VoiceXP] ${newState.member.user.username} went AFK (muted/deafened)`);
+        console.log(
+          `[VoiceXP] ${newState.member.user.username} went AFK (muted/deafened)`
+        );
         stopTracking(trackingKey);
       } else if (wasAFK && !isAFK) {
-        console.log(`[VoiceXP] ${newState.member.user.username} came back from AFK`);
+        console.log(
+          `[VoiceXP] ${newState.member.user.username} came back from AFK`
+        );
         await startTracking(client, newState, voiceConfig, trackingKey);
       }
     }
@@ -72,7 +86,9 @@ async function startTracking(client, voiceState, voiceConfig, trackingKey) {
   const member = voiceState.member;
 
   // Check if user is excluded
-  const excludedData = await levelExcludedRolesSchema.findOne({ Guild: guildId });
+  const excludedData = await levelExcludedRolesSchema.findOne({
+    Guild: guildId,
+  });
   if (excludedData) {
     // Check if user is directly excluded
     if (excludedData.Users?.includes(userId)) {
@@ -107,7 +123,10 @@ async function startTracking(client, voiceState, voiceConfig, trackingKey) {
   }
 
   // Check if user is AFK (muted/deafened)
-  if (voiceConfig.AFKDetection && (voiceState.selfDeaf || voiceState.selfMute)) {
+  if (
+    voiceConfig.AFKDetection &&
+    (voiceState.selfDeaf || voiceState.selfMute)
+  ) {
     console.log(`[VoiceXP] User ${member.user.username} is AFK, not tracking`);
     return;
   }
@@ -160,12 +179,17 @@ async function grantVoiceXP(client, voiceState, voiceConfig) {
     // Double-check user is still in voice and not AFK
     const currentState = voiceState.guild.members.cache.get(userId)?.voice;
     if (!currentState || !currentState.channelId) {
-      console.log(`[VoiceXP] User ${member.user.username} no longer in voice, stopping`);
+      console.log(
+        `[VoiceXP] User ${member.user.username} no longer in voice, stopping`
+      );
       stopTracking(`${guildId}_${userId}`);
       return;
     }
 
-    if (voiceConfig.AFKDetection && (currentState.selfDeaf || currentState.selfMute)) {
+    if (
+      voiceConfig.AFKDetection &&
+      (currentState.selfDeaf || currentState.selfMute)
+    ) {
       console.log(`[VoiceXP] User ${member.user.username} is AFK, skipping XP`);
       return;
     }
@@ -189,7 +213,9 @@ async function grantVoiceXP(client, voiceState, voiceConfig) {
     // Handle level up (same as text messages)
     if (hasLeveledUp) {
       const user = await client.fetchLevels(userId, guildId);
-      console.log(`[VoiceXP] ${member.user.username} leveled up to ${user.level}!`);
+      console.log(
+        `[VoiceXP] ${member.user.username} leveled up to ${user.level}!`
+      );
 
       // Check for level rewards and PVC rewards (reuse existing system)
       const levelRewards = require("../../database/models/levelRewards");
@@ -206,7 +232,9 @@ async function grantVoiceXP(client, voiceState, voiceConfig) {
         const role = voiceState.guild.roles.cache.get(reward.Role);
         if (role && !member.roles.cache.has(role.id)) {
           await member.roles.add(role).catch(() => {});
-          console.log(`[VoiceXP] Granted role ${role.name} to ${member.user.username}`);
+          console.log(
+            `[VoiceXP] Granted role ${role.name} to ${member.user.username}`
+          );
         }
       }
 

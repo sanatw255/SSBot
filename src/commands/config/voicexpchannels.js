@@ -15,8 +15,14 @@ module.exports = async (client, interaction, args) => {
   const action = interaction.options.getString("action");
   const channel = interaction.options.getChannel("channel");
 
-  console.log(`[voicexpchannels] Command received from: ${interaction.user.username}`);
-  console.log(`[voicexpchannels] Action: ${action}, Channel: ${channel ? channel.name : "none"}`);
+  console.log(
+    `[voicexpchannels] Command received from: ${interaction.user.username}`
+  );
+  console.log(
+    `[voicexpchannels] Action: ${action}, Channel: ${
+      channel ? channel.name : "none"
+    }`
+  );
 
   try {
     let data = await voiceXPChannels.findOne({ Guild: interaction.guild.id });
@@ -68,11 +74,15 @@ module.exports = async (client, interaction, args) => {
 
         data.Channels.push(channel.id);
         await data.save();
-        console.log(`[voicexpchannels] Added channel: ${channel.name} (${channel.id})`);
+        console.log(
+          `[voicexpchannels] Added channel: ${channel.name} (${channel.id})`
+        );
 
         client.succNormal(
           {
-            text: `${isCategory ? "Category" : "Voice channel"} ${channel.name} will now grant XP!`,
+            text: `${isCategory ? "Category" : "Voice channel"} ${
+              channel.name
+            } will now grant XP!`,
             type: "editreply",
           },
           interaction
@@ -103,7 +113,9 @@ module.exports = async (client, interaction, args) => {
 
         data.Channels = data.Channels.filter((c) => c !== channel.id);
         await data.save();
-        console.log(`[voicexpchannels] Removed channel: ${channel.name} (${channel.id})`);
+        console.log(
+          `[voicexpchannels] Removed channel: ${channel.name} (${channel.id})`
+        );
 
         client.succNormal(
           {
@@ -119,7 +131,8 @@ module.exports = async (client, interaction, args) => {
         if (!data.Channels || data.Channels.length === 0) {
           return client.errNormal(
             {
-              error: "No voice channels configured! XP will be granted in ALL voice channels.",
+              error:
+                "No voice channels configured! XP will be granted in ALL voice channels.",
               type: "editreply",
             },
             interaction
@@ -129,7 +142,10 @@ module.exports = async (client, interaction, args) => {
         const channelsList = data.Channels.map((channelId) => {
           const guildChannel = interaction.guild.channels.cache.get(channelId);
           if (guildChannel) {
-            const type = guildChannel.type === Discord.ChannelType.GuildCategory ? "📁" : "🔊";
+            const type =
+              guildChannel.type === Discord.ChannelType.GuildCategory
+                ? "📁"
+                : "🔊";
             return `${type} ${guildChannel.name}`;
           }
           return `❌ Deleted Channel (${channelId})`;
