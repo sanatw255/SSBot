@@ -8,6 +8,7 @@ const messageRewards = require("../../database/models/messageRewards");
 const Schema = require("../../database/models/stickymessages");
 const levelRewards = require("../../database/models/levelRewards");
 const levelLogs = require("../../database/models/levelChannels");
+const levelExcludedRolesSchema = require("../../database/models/levelExcludedRoles");
 const levelChannelsSchema = require("../../database/models/levelChannels");
 const Commands = require("../../database/models/customCommand");
 const CommandsSchema = require("../../database/models/customCommandAdvanced");
@@ -90,6 +91,23 @@ module.exports = async (client, message) => {
   try {
     const data = await Functions.findOne({ Guild: message.guild.id });
     if (data && data.Levels === true) {
+      // Check if user has excluded role
+      const excludedRolesData = await levelExcludedRolesSchema.findOne({
+        Guild: message.guild.id,
+      });
+
+      let isExcluded = false;
+      if (excludedRolesData?.Roles?.length > 0 && message.member) {
+        isExcluded = message.member.roles.cache.some((role) =>
+          excludedRolesData.Roles.includes(role.id)
+        );
+      }
+
+      if (isExcluded) {
+        // User has an excluded role, skip XP gain
+        return;
+      }
+
       const levelChannelData = await levelChannelsSchema.findOne({
         Guild: message.guild.id,
       });

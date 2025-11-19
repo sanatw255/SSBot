@@ -48,6 +48,30 @@ module.exports = {
     )
     .addSubcommand((subcommand) =>
       subcommand
+        .setName("levelexcludedroles")
+        .setDescription("Manage roles that won't gain XP")
+        .addStringOption((option) =>
+          option
+            .setName("action")
+            .setDescription("Action to perform")
+            .setRequired(true)
+            .addChoices(
+              { name: "Add Role", value: "add" },
+              { name: "Remove Role", value: "remove" },
+              { name: "List Roles", value: "list" },
+              { name: "Clear All", value: "clear" }
+            )
+        )
+        .addRoleOption((option) =>
+          option
+            .setName("role")
+            .setDescription(
+              "Role to exclude/include (not needed for list/clear)"
+            )
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
         .setName("setcolor")
         .setDescription("Set a custom embed color")
         .addStringOption((option) =>
