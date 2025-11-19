@@ -49,25 +49,33 @@ module.exports = {
     .addSubcommand((subcommand) =>
       subcommand
         .setName("levelexcludedroles")
-        .setDescription("Manage roles that won't gain XP")
+        .setDescription("Manage roles/users that won't gain XP")
         .addStringOption((option) =>
           option
             .setName("action")
             .setDescription("Action to perform")
             .setRequired(true)
             .addChoices(
-              { name: "Add Role", value: "add" },
-              { name: "Remove Role", value: "remove" },
-              { name: "List Roles", value: "list" },
+              { name: "Add", value: "add" },
+              { name: "Remove", value: "remove" },
+              { name: "List", value: "list" },
               { name: "Clear All", value: "clear" }
             )
         )
-        .addRoleOption((option) =>
+        .addStringOption((option) =>
           option
-            .setName("role")
-            .setDescription(
-              "Role to exclude/include (not needed for list/clear)"
+            .setName("type")
+            .setDescription("Type to add/remove (not needed for list/clear)")
+            .addChoices(
+              { name: "Role", value: "role" },
+              { name: "User", value: "user" }
             )
+        )
+        .addRoleOption((option) =>
+          option.setName("role").setDescription("Role to exclude/include")
+        )
+        .addUserOption((option) =>
+          option.setName("user").setDescription("User to exclude/include")
         )
     )
     .addSubcommand((subcommand) =>

@@ -91,20 +91,31 @@ module.exports = async (client, message) => {
   try {
     const data = await Functions.findOne({ Guild: message.guild.id });
     if (data && data.Levels === true) {
-      // Check if user has excluded role
+      // Check if user has excluded role or is an excluded user
       const excludedRolesData = await levelExcludedRolesSchema.findOne({
         Guild: message.guild.id,
       });
 
       let isExcluded = false;
-      if (excludedRolesData?.Roles?.length > 0 && message.member) {
+
+      // Check if user is directly excluded
+      if (excludedRolesData?.Users?.length > 0) {
+        isExcluded = excludedRolesData.Users.includes(message.author.id);
+      }
+
+      // Check if user has an excluded role
+      if (
+        !isExcluded &&
+        excludedRolesData?.Roles?.length > 0 &&
+        message.member
+      ) {
         isExcluded = message.member.roles.cache.some((role) =>
           excludedRolesData.Roles.includes(role.id)
         );
       }
 
       if (isExcluded) {
-        // User has an excluded role, skip XP gain
+        // User has an excluded role or is an excluded user, skip XP gain
         return;
       }
 
