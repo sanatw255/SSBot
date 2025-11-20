@@ -211,10 +211,23 @@ module.exports = async (client, message, args) => {
       .edit(newOwner.id, {
         Connect: true,
         Speak: true,
+        ViewChannel: true,
         Stream: true,
         ManageChannels: true,
       })
       .catch(() => {});
+
+    // Kick old owner to prevent billing confusion
+    const oldOwnerMember = voiceChannel.members.get(message.author.id);
+    if (oldOwnerMember) {
+      try {
+        await oldOwnerMember.voice.disconnect(
+          "Ownership transferred - you can be re-invited by new owner"
+        );
+      } catch (err) {
+        console.log("Could not disconnect old owner:", err.message);
+      }
+    }
 
     // Notify new owner
     try {

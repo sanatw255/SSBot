@@ -612,25 +612,301 @@ async function handleRename(client, interaction, vcData, voiceChannel) {
 }
 
 async function handleTransfer(client, interaction, vcData, voiceChannel) {
-  // Show modal for user input
-  const modal = new Discord.ModalBuilder()
-    .setCustomId("pvcTransferModal")
-    .setTitle("Transfer VC Ownership");
+  const voiceChannels = require("../../database/models/voiceChannels");
+  const guildID = interaction.guild.id;
+  const userID = interaction.user.id;
 
-  const userInput = new Discord.TextInputBuilder()
-    .setCustomId("transferUser")
-    .setLabel("New owner (User ID or @mention)")
-    .setStyle(Discord.TextInputStyle.Short)
-    .setPlaceholder("Enter user ID or paste @mention")
-    .setRequired(true)
-    .setMaxLength(30);
+  // Reply with ephemeral message asking for mention
+  await interaction.reply({
+    embeds: [
+      new Discord.EmbedBuilder()
+        .setDescription(
+          "🔄 **Transfer VC Ownership**\n\n" +
+            "Please **@mention** the user you want to transfer this VC to in the chat.\n\n" +
+            "⏱️ You have 30 seconds to mention the user."
+        )
+        .setColor("#3498db"),
+    ],
+    flags: Discord.MessageFlags.Ephemeral,
+  });
 
-  const firstActionRow = new Discord.ActionRowBuilder().addComponents(
-    userInput
-  );
-  modal.addComponents(firstActionRow);
+  // Create message collector
+  const filter = (m) => m.author.id === interaction.user.id;
+  const collector = interaction.channel.createMessageCollector({
+    filter,
+    time: 30000,
+    max: 1,
+  });
 
-  await interaction.showModal(modal);
+  collector.on("collect", async (message) => {
+    // Delete the user's message
+    await message.delete().catch(() => {});
+
+    // Get mentioned user
+    const mentionedUser = message.mentions.users.first();
+
+    if (!mentionedUser) {
+      return interaction.editReply({
+        embeds: [
+          new Discord.EmbedBuilder()
+            .setDescription("❌ No user mentioned! Please try again.")
+            .setColor("#FF0000"),
+        ],
+      });
+    }
+
+    if (mentionedUser.id === userID) {
+      return interaction.editReply({
+        embeds: [
+          new Discord.EmbedBuilder()
+            .setDescription("❌ You cannot transfer to yourself!")
+            .setColor("#FF0000"),
+        ],
+      });
+    }
+
+    if (mentionedUser.bot) {
+      return interaction.editReply({
+        embeds: [
+          new Discord.EmbedBuilder()
+            .setDescription("❌ You cannot transfer to bots!")
+            .setColor("#FF0000"),
+        ],
+      });
+    }
+
+    const targetMember = await interaction.guild.members
+      .fetch(mentionedUser.id)
+      .catch(() => null);
+
+    if (!targetMember) {
+      return interaction.editReply({
+        embeds: [
+          new Discord.EmbedBuilder()
+            .setDescription("❌ User not found in this server!")
+            .setColor("#FF0000"),
+        ],
+      });
+    }
+
+    // Check if new owner already has a VC
+    const existingVC = await voiceChannels.findOne({
+      Guild: guildID,
+      Owner: mentionedUser.id,
+    });
+
+    if (existingVC) {
+      return interaction.editReply({
+        embeds: [
+          new Discord.EmbedBuilder()
+            .setDescription(
+              `❌ ${targetMember} already owns a voice channel!\n` +
+                `They must delete their existing VC first.`
+            )
+            .setColor("#FF0000"),
+        ],
+      });
+    }
+
+    // Show confirmation buttons
+    const row = new Discord.ActionRowBuilder().addComponents(
+      new Discord.ButtonBuilder()
+        .setCustomId("pvc_transfer_confirm")
+        .setLabel("Confirm Transfer")
+        .setEmoji("✅")
+        .setStyle(Discord.ButtonStyle.Success),
+
+      new Discord.ButtonBuilder()
+        .setCustomId("pvc_transfer_cancel")
+        .setLabel("Cancel")
+        .setEmoji("❌")
+        .setStyle(Discord.ButtonStyle.Secondary)
+    );
+
+    await interaction.editReply({
+      embeds: [
+        new Discord.EmbedBuilder()
+          .setDescription(
+            `⚠️ Transfer ownership to ${targetMember}?\n\n` +
+              `**You will lose control of this VC!**\n` +
+              `**You will be able to create a new VC after transfer.**`
+          )
+          .setColor("#FFA500"),
+      ],
+      components: [row],
+    });
+
+    // Wait for confirmation
+    const confirmFilter = (i) => i.user.id === userID;
+    const confirmCollector =
+      interaction.channel.createMessageComponentCollector({
+        confirmFilter,
+        componentType: Discord.ComponentType.Button,
+        time: 15000,
+      });
+
+    confirmCollector.on("collect", async (i) => {
+      if (i.customId === "pvc_transfer_confirm") {
+        try {
+          let billingMessage = "";
+
+          // Handle PAYG billing transfer
+          if (vcData.IsPAYG) {
+            const pvcConfig = require("../../database/models/pvcConfig");
+            const pvcEconomy = require("../../database/models/pvcEconomy");
+
+            const config = await pvcConfig.findOne({ Guild: guildID });
+            const paygRate = config?.PAYGPerMinute || 60;
+
+            // Calculate old owner's cost
+            const activeSince = vcData.ActiveSince || vcData.CreatedAt;
+            const now = new Date();
+            const elapsed = now - activeSince.getTime();
+            const minutesElapsed = Math.floor(elapsed / (1000 * 60));
+            const totalCost = minutesElapsed * paygRate;
+
+            // Deduct from old owner
+            const oldOwnerData = await pvcEconomy.findOne({
+              Guild: guildID,
+              User: userID,
+            });
+
+            if (oldOwnerData && totalCost > 0) {
+              oldOwnerData.Coins = Math.max(0, oldOwnerData.Coins - totalCost);
+              oldOwnerData.TotalSpent += totalCost;
+              await oldOwnerData.save();
+
+              vcData.CoinsSpent += totalCost;
+              billingMessage = `\n💰 Your final bill: **${totalCost.toLocaleString()} coins** (${minutesElapsed} minutes)`;
+            }
+
+            // Reset billing for new owner
+            vcData.ActiveSince = new Date(); // New owner's billing starts now
+            vcData.LastPAYGDeduction = null;
+          }
+
+          // Update owner in database
+          vcData.Owner = mentionedUser.id;
+          await vcData.save();
+
+          // Update permissions
+          await voiceChannel.permissionOverwrites.delete(userID);
+          await voiceChannel.permissionOverwrites.edit(mentionedUser.id, {
+            Connect: true,
+            Speak: true,
+            ViewChannel: true,
+            ManageChannels: true,
+          });
+
+          // Kick old owner to prevent billing confusion
+          const oldOwnerMember = voiceChannel.members.get(userID);
+          if (oldOwnerMember) {
+            try {
+              await oldOwnerMember.voice.disconnect(
+                "Ownership transferred - you can be re-invited by new owner"
+              );
+            } catch (err) {
+              console.log("Could not disconnect old owner:", err.message);
+            }
+          }
+
+          // Send DM to new owner
+          try {
+            const pvcConfig = require("../../database/models/pvcConfig");
+            const config = await pvcConfig.findOne({ Guild: guildID });
+
+            const dmMessage = vcData.IsPAYG
+              ? `🎙️ You are now the owner of **${voiceChannel.name}**!\n\n` +
+                `Transferred from: ${interaction.user}\n` +
+                `**Mode:** Pay-As-You-Go (**${
+                  config?.PAYGPerMinute || 60
+                } coins/min**)\n\n` +
+                `Billing starts now. Use \`/pvcpanel\` or prefix commands to manage it.`
+              : `🎙️ You are now the owner of **${voiceChannel.name}**!\n\n` +
+                `Transferred from: ${interaction.user}\n` +
+                `Use \`/pvcpanel\` or prefix commands to manage it.`;
+
+            await targetMember.send({
+              embeds: [
+                new Discord.EmbedBuilder()
+                  .setDescription(dmMessage)
+                  .setColor("#00FF00"),
+              ],
+            });
+          } catch (err) {
+            console.log("Could not DM new owner");
+          }
+
+          await i.update({
+            embeds: [
+              new Discord.EmbedBuilder()
+                .setDescription(
+                  `✅ Transferred ownership to ${targetMember}!${billingMessage}\n\n` +
+                    `You can now create a new voice channel.`
+                )
+                .setColor("#00FF00"),
+            ],
+            components: [],
+          });
+
+          confirmCollector.stop();
+        } catch (err) {
+          console.error("Transfer error:", err);
+          await i.update({
+            embeds: [
+              new Discord.EmbedBuilder()
+                .setDescription("❌ Failed to transfer ownership!")
+                .setColor("#FF0000"),
+            ],
+            components: [],
+          });
+        }
+      } else if (i.customId === "pvc_transfer_cancel") {
+        await i.update({
+          embeds: [
+            new Discord.EmbedBuilder()
+              .setDescription("❌ Transfer cancelled")
+              .setColor("#FF0000"),
+          ],
+          components: [],
+        });
+        confirmCollector.stop();
+      }
+    });
+
+    confirmCollector.on("end", (collected) => {
+      if (collected.size === 0) {
+        interaction
+          .editReply({
+            embeds: [
+              new Discord.EmbedBuilder()
+                .setDescription(
+                  "⏱️ Transfer confirmation timed out. Please try again."
+                )
+                .setColor("#FF0000"),
+            ],
+            components: [],
+          })
+          .catch(() => {});
+      }
+    });
+  });
+
+  collector.on("end", (collected) => {
+    if (collected.size === 0) {
+      interaction
+        .editReply({
+          embeds: [
+            new Discord.EmbedBuilder()
+              .setDescription(
+                "⏱️ Transfer timed out - no user mentioned. Please try again."
+              )
+              .setColor("#FF0000"),
+          ],
+        })
+        .catch(() => {});
+    }
+  });
 }
 
 async function handleLock(client, interaction, vcData, voiceChannel) {

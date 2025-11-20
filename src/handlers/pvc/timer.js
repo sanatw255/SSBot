@@ -40,28 +40,65 @@ module.exports = async (client) => {
             if (new Date() >= vcData.ExpiresAt) {
               // VC has expired
               try {
-                // Get owner
+                // Calculate session duration
+                const sessionStart = vcData.CreatedAt;
+                const sessionEnd = new Date();
+                const sessionMinutes = Math.floor(
+                  (sessionEnd - sessionStart) / (1000 * 60)
+                );
+                const totalSpent = vcData.CoinsSpent || 0;
+
+                // Get owner and their balance
                 const owner = await guild.members
                   .fetch(vcData.Owner)
                   .catch(() => null);
 
-                // Notify owner if they're in the VC
-                if (owner && voiceChannel.members.has(owner.id)) {
+                let currentBalance = 0;
+                if (owner) {
+                  const pvcEconomy = require("../../database/models/pvcEconomy");
+                  const userData = await pvcEconomy.findOne({
+                    Guild: vcData.Guild,
+                    User: vcData.Owner,
+                  });
+                  currentBalance = userData?.Coins || 0;
+                }
+
+                // Notify owner about session end
+                if (owner) {
+                  const summaryEmbed = new Discord.EmbedBuilder()
+                    .setColor("#FF0000")
+                    .setTitle("⏰ Your VC Session Ended")
+                    .setDescription(
+                      `Your private voice channel **${voiceChannel.name}** has expired and been deleted.\n\n` +
+                        `📊 **Session Summary:**\n` +
+                        `⏱️ Duration: **${sessionMinutes} minutes**\n` +
+                        `💰 Total Spent: **${totalSpent.toLocaleString()} coins**\n` +
+                        `💵 Current Balance: **${currentBalance.toLocaleString()} coins**\n\n` +
+                        `Use \`!create <duration>\` to create a new one!`
+                    )
+                    .setTimestamp();
+
                   try {
-                    await owner.send({
-                      embeds: [
-                        new Discord.EmbedBuilder()
-                          .setColor("#FF0000")
-                          .setTitle("⏰ Your VC Time Expired")
-                          .setDescription(
-                            `Your private voice channel **${voiceChannel.name}** has expired and been deleted.\n\n` +
-                              `Use \`!create <duration>\` to create a new one!`
-                          )
-                          .setTimestamp(),
-                      ],
-                    });
+                    await owner.send({ embeds: [summaryEmbed] });
                   } catch (e) {
-                    // Can't DM user
+                    // Can't DM user, try posting in commands channel
+                    const pvcConfig = require("../../database/models/pvcConfig");
+                    const config = await pvcConfig.findOne({
+                      Guild: vcData.Guild,
+                    });
+                    if (config?.CommandsChannel) {
+                      const commandsChannel = guild.channels.cache.get(
+                        config.CommandsChannel
+                      );
+                      if (commandsChannel) {
+                        await commandsChannel
+                          .send({
+                            content: `${owner}`,
+                            embeds: [summaryEmbed],
+                          })
+                          .catch(() => {});
+                      }
+                    }
                   }
                 }
 
@@ -262,6 +299,7 @@ module.exports = async (client) => {
                   User: vcData.Owner,
                 });
 
+                let currentBalance = 0;
                 if (userData && sessionCost > 0) {
                   userData.Coins = Math.max(0, userData.Coins - sessionCost);
                   userData.TotalSpent += sessionCost;
@@ -269,6 +307,49 @@ module.exports = async (client) => {
 
                   vcData.CoinsSpent += sessionCost;
                   await vcData.save();
+
+                  currentBalance = userData.Coins;
+                } else if (userData) {
+                  currentBalance = userData.Coins;
+                }
+
+                // Send billing summary to owner
+                const owner = await guild.members
+                  .fetch(vcData.Owner)
+                  .catch(() => null);
+
+                if (owner) {
+                  const summaryEmbed = new Discord.EmbedBuilder()
+                    .setColor("#FFA500")
+                    .setTitle("📊 PAYG VC Session Ended")
+                    .setDescription(
+                      `Your Pay-As-You-Go voice channel **${voiceChannel.name}** was automatically deleted after being empty for 2 minutes.\n\n` +
+                        `📊 **Session Summary:**\n` +
+                        `⏱️ Duration: **${minutesElapsed} minutes**\n` +
+                        `💰 Total Cost: **${sessionCost.toLocaleString()} coins**\n` +
+                        `💵 Current Balance: **${currentBalance.toLocaleString()} coins**\n\n` +
+                        `Use \`!j2c\` to create a new PAYG VC!`
+                    )
+                    .setTimestamp();
+
+                  try {
+                    await owner.send({ embeds: [summaryEmbed] });
+                  } catch (e) {
+                    // Can't DM user, try posting in commands channel
+                    if (config?.CommandsChannel) {
+                      const commandsChannel = guild.channels.cache.get(
+                        config.CommandsChannel
+                      );
+                      if (commandsChannel) {
+                        await commandsChannel
+                          .send({
+                            content: `${owner}`,
+                            embeds: [summaryEmbed],
+                          })
+                          .catch(() => {});
+                      }
+                    }
+                  }
                 }
 
                 await voiceChannel.delete("PAYG VC empty for 2+ minutes");
