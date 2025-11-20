@@ -77,9 +77,10 @@ module.exports = async (client, message, args) => {
         vcData.InvitedUsers.push(user.id);
         invited.push(user);
 
-        // Grant Connect permission
+        // Grant permissions (including ViewChannel for hidden VCs)
         await voiceChannel.permissionOverwrites
           .edit(user.id, {
+            ViewChannel: true,
             Connect: true,
             Speak: true,
             Stream: true,

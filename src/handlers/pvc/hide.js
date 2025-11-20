@@ -50,12 +50,26 @@ module.exports = async (client, message, args) => {
     const newHideState = !vcData.IsHidden;
 
     try {
-      // Update permissions
+      // Update permissions for @everyone
       if (newHideState) {
         // Hide: Remove VIEW_CHANNEL permission from @everyone
         await voiceChannel.permissionOverwrites.edit(message.guild.id, {
           ViewChannel: false,
         });
+
+        // Ensure owner can always see and access their VC
+        await voiceChannel.permissionOverwrites.edit(vcData.Owner, {
+          ViewChannel: true,
+          Connect: true,
+        });
+
+        // Ensure all invited users can see and access the VC
+        for (const userId of vcData.InvitedUsers) {
+          await voiceChannel.permissionOverwrites.edit(userId, {
+            ViewChannel: true,
+            Connect: true,
+          });
+        }
       } else {
         // Unhide: Allow VIEW_CHANNEL for @everyone
         await voiceChannel.permissionOverwrites.edit(message.guild.id, {
