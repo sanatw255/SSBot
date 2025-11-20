@@ -30,7 +30,7 @@ module.exports = async (client, interaction, args) => {
           {
             name: "📝 Commands Available",
             value:
-              "`!create`, `!extend`, `!rename`, `!delete`, `!transfer`, `!vi`, `!vui`",
+              "`!create`, `!extend`, `!rename`, `!delete`, `!transfer`, `!vi`, `!vui`, `!lock`, `!hide`",
           },
         ],
         type: "editreply",

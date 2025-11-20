@@ -15,6 +15,8 @@ const uninviteHandler = require("../../handlers/pvc/uninvite");
 const deleteHandler = require("../../handlers/pvc/delete");
 const renameHandler = require("../../handlers/pvc/rename");
 const transferHandler = require("../../handlers/pvc/transfer");
+const lockHandler = require("../../handlers/pvc/lock");
+const hideHandler = require("../../handlers/pvc/hide");
 
 module.exports = async (client, message) => {
   // Ignore bots and DMs
@@ -59,6 +61,14 @@ module.exports = async (client, message) => {
       await renameHandler(client, message, args);
     } else if (command === "!transfer") {
       await transferHandler(client, message, args);
+    } else if (command === "!lock" || command === "!unlock") {
+      await lockHandler(client, message, args);
+    } else if (
+      command === "!hide" ||
+      command === "!unhide" ||
+      command === "!show"
+    ) {
+      await hideHandler(client, message, args);
     }
   } catch (err) {
     console.error("Error in PVC message handler:", err);
