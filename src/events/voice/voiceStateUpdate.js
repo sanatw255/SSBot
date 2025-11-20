@@ -38,10 +38,12 @@ module.exports = async (client, oldState, newState) => {
           if (memberCount < 1 || memberCount == 0) {
             // Check if this is a PVC channel (has ExpiresAt or IsPAYG)
             const isPVC = data2.ExpiresAt || data2.IsPAYG;
-            
+
             if (isPVC) {
               // Don't delete PVC channels when empty - let the timer handle it
-              console.log(`[VC] PVC channel ${channel?.name} is empty but has active timer, not deleting`);
+              console.log(
+                `[VC] PVC channel ${channel?.name} is empty but has active timer, not deleting`
+              );
               return;
             }
 
@@ -90,10 +92,12 @@ module.exports = async (client, oldState, newState) => {
               if (memberCount < 1 || memberCount == 0) {
                 // Check if this is a PVC channel (has ExpiresAt or IsPAYG)
                 const isPVC = oldChannelData.ExpiresAt || oldChannelData.IsPAYG;
-                
+
                 if (isPVC) {
                   // Don't delete PVC channels when empty - let the timer handle it
-                  console.log(`[VC] PVC channel ${channel?.name} is empty but has active timer, not deleting`);
+                  console.log(
+                    `[VC] PVC channel ${channel?.name} is empty but has active timer, not deleting`
+                  );
                 } else {
                   // Only delete J2C channels when empty
                   if (data.ChannelCount) {
@@ -120,9 +124,6 @@ module.exports = async (client, oldState, newState) => {
                     console.error("Error in channel cleanup:", e);
                   }
                 }
-              } catch (e) {
-                console.error("Error in old channel cleanup:", e);
-              }
               }
             } catch (e) {
               console.error("Error processing old channel data:", e);
