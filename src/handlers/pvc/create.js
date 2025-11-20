@@ -228,7 +228,7 @@ module.exports = async (client, message, args) => {
         CreatedAt: new Date(),
         ExpiresAt: expiresAt,
         IsPAYG: false,
-        IsLocked: false,
+        IsLocked: true, // Locked by default (Connect denied for @everyone)
         IsHidden: false,
         InvitedUsers: [],
         PaidDuration: durationMinutes,
