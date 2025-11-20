@@ -156,6 +156,43 @@ module.exports = async (client, message, args) => {
         .catch(() => {});
     }
 
+    let billingMessage = "";
+
+    // Handle PAYG billing transfer
+    if (vcData.IsPAYG) {
+      const pvcConfig = require("../../database/models/pvcConfig");
+      const pvcEconomy = require("../../database/models/pvcEconomy");
+
+      const configData = await pvcConfig.findOne({ Guild: message.guild.id });
+      const paygRate = configData?.PAYGPerMinute || 60;
+
+      // Calculate old owner's cost
+      const activeSince = vcData.ActiveSince || vcData.CreatedAt;
+      const now = new Date();
+      const elapsed = now - activeSince.getTime();
+      const minutesElapsed = Math.floor(elapsed / (1000 * 60));
+      const totalCost = minutesElapsed * paygRate;
+
+      // Deduct from old owner
+      const oldOwnerData = await pvcEconomy.findOne({
+        Guild: message.guild.id,
+        User: message.author.id,
+      });
+
+      if (oldOwnerData && totalCost > 0) {
+        oldOwnerData.Coins = Math.max(0, oldOwnerData.Coins - totalCost);
+        oldOwnerData.TotalSpent += totalCost;
+        await oldOwnerData.save();
+
+        vcData.CoinsSpent += totalCost;
+        billingMessage = `\n\n💰 **Your Final Bill:** ${totalCost.toLocaleString()} coins (${minutesElapsed} minutes)`;
+      }
+
+      // Reset billing for new owner
+      vcData.ActiveSince = new Date(); // New owner's billing starts now
+      vcData.LastPAYGDeduction = null;
+    }
+
     // Transfer ownership
     vcData.Owner = newOwner.id;
     await vcData.save();
@@ -201,7 +238,7 @@ module.exports = async (client, message, args) => {
       .setColor("#00FF00")
       .setTitle("✅ Ownership Transferred!")
       .setDescription(
-        `Ownership of ${voiceChannel} has been transferred to ${newOwner}!\n\n` +
+        `Ownership of ${voiceChannel} has been transferred to ${newOwner}!${billingMessage}\n\n` +
           `You can now create a new VC with \`!create <duration>\`.`
       )
       .setFooter({ text: message.guild.name, iconURL: message.guild.iconURL() })

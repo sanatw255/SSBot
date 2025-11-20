@@ -554,6 +554,43 @@ async function handleTransferModal(
   collector.on("collect", async (i) => {
     if (i.customId === "pvc_transfer_confirm") {
       try {
+        let billingMessage = "";
+
+        // Handle PAYG billing transfer
+        if (vcData.IsPAYG) {
+          const pvcConfig = require("../../database/models/pvcConfig");
+          const pvcEconomy = require("../../database/models/pvcEconomy");
+
+          const config = await pvcConfig.findOne({ Guild: guildID });
+          const paygRate = config?.PAYGPerMinute || 60;
+
+          // Calculate old owner's cost
+          const activeSince = vcData.ActiveSince || vcData.CreatedAt;
+          const now = new Date();
+          const elapsed = now - activeSince.getTime();
+          const minutesElapsed = Math.floor(elapsed / (1000 * 60));
+          const totalCost = minutesElapsed * paygRate;
+
+          // Deduct from old owner
+          const oldOwnerData = await pvcEconomy.findOne({
+            Guild: guildID,
+            User: userID,
+          });
+
+          if (oldOwnerData && totalCost > 0) {
+            oldOwnerData.Coins = Math.max(0, oldOwnerData.Coins - totalCost);
+            oldOwnerData.TotalSpent += totalCost;
+            await oldOwnerData.save();
+
+            vcData.CoinsSpent += totalCost;
+            billingMessage = `\n💰 Your final bill: **${totalCost.toLocaleString()} coins** (${minutesElapsed} minutes)`;
+          }
+
+          // Reset billing for new owner
+          vcData.ActiveSince = new Date(); // New owner's billing starts now
+          vcData.LastPAYGDeduction = null;
+        }
+
         // Update owner in database
         vcData.Owner = targetUserId;
         await vcData.save();
@@ -569,14 +606,21 @@ async function handleTransferModal(
 
         // Send DM to new owner
         try {
+          const dmMessage = vcData.IsPAYG
+            ? `🎙️ You are now the owner of **${voiceChannel.name}**!\n\n` +
+              `Transferred from: ${interaction.user}\n` +
+              `**Mode:** Pay-As-You-Go (**${
+                config?.PAYGPerMinute || 60
+              } coins/min**)\n\n` +
+              `Billing starts now. Use \`/pvcpanel\` or prefix commands to manage it.`
+            : `🎙️ You are now the owner of **${voiceChannel.name}**!\n\n` +
+              `Transferred from: ${interaction.user}\n` +
+              `Use \`/pvcpanel\` or prefix commands to manage it.`;
+
           await targetMember.send({
             embeds: [
               new Discord.EmbedBuilder()
-                .setDescription(
-                  `🎙️ You are now the owner of **${voiceChannel.name}**!\n\n` +
-                    `Transferred from: ${interaction.user}\n` +
-                    `Use \`/pvcpanel\` or prefix commands to manage it.`
-                )
+                .setDescription(dmMessage)
                 .setColor("#00FF00"),
             ],
           });
@@ -588,7 +632,7 @@ async function handleTransferModal(
           embeds: [
             new Discord.EmbedBuilder()
               .setDescription(
-                `✅ Transferred ownership to ${targetMember}!\n\n` +
+                `✅ Transferred ownership to ${targetMember}!${billingMessage}\n\n` +
                   `You can now create a new voice channel.`
               )
               .setColor("#00FF00"),

@@ -235,13 +235,42 @@ module.exports = async (client) => {
             }
           }
 
-          // Check if PAYG VC is empty (everyone left)
+          // Check if PAYG VC is empty (all members left)
           if (vcData.IsPAYG && memberCount === 0) {
-            // Wait 2 minutes before deleting (grace period)
-            const timeSinceCreation =
-              (new Date() - vcData.CreatedAt) / (1000 * 60);
-            if (timeSinceCreation >= 2) {
+            // Set EmptySince if not already set
+            if (!vcData.EmptySince) {
+              vcData.EmptySince = new Date();
+              await vcData.save();
+            }
+
+            // Wait 2 minutes after becoming empty before deleting
+            const timeSinceEmpty =
+              (new Date() - vcData.EmptySince) / (1000 * 60);
+            if (timeSinceEmpty >= 2) {
               try {
+                // Calculate final billing before deletion
+                const activeSince = vcData.ActiveSince || vcData.CreatedAt;
+                const now = new Date();
+                const elapsed = now - activeSince.getTime();
+                const minutesElapsed = Math.floor(elapsed / (1000 * 60));
+                const sessionCost = minutesElapsed * config.PAYGPerMinute;
+
+                // Deduct final amount from owner
+                const pvcEconomy = require("../../database/models/pvcEconomy");
+                const userData = await pvcEconomy.findOne({
+                  Guild: vcData.Guild,
+                  User: vcData.Owner,
+                });
+
+                if (userData && sessionCost > 0) {
+                  userData.Coins = Math.max(0, userData.Coins - sessionCost);
+                  userData.TotalSpent += sessionCost;
+                  await userData.save();
+
+                  vcData.CoinsSpent += sessionCost;
+                  await vcData.save();
+                }
+
                 await voiceChannel.delete("PAYG VC empty for 2+ minutes");
                 await voiceChannels.deleteOne({ _id: vcData._id });
                 cooldowns.clearCooldown(vcData.Channel);
@@ -256,12 +285,16 @@ module.exports = async (client) => {
                 }
 
                 console.log(
-                  `[PVC PAYG] Deleted empty PAYG VC: ${voiceChannel.name}`
+                  `[PVC PAYG] Deleted empty PAYG VC: ${voiceChannel.name} (Final cost: ${sessionCost} coins)`
                 );
               } catch (err) {
                 console.error(`[PVC PAYG] Error deleting empty VC:`, err);
               }
             }
+          } else if (vcData.IsPAYG && memberCount > 0 && vcData.EmptySince) {
+            // VC was empty but someone joined - clear EmptySince
+            vcData.EmptySince = null;
+            await vcData.save();
           }
         } catch (err) {
           console.error(`[PVC Timer] Error processing VC:`, err);

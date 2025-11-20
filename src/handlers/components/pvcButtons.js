@@ -167,32 +167,99 @@ async function handleAutoToggle(client, interaction, vcData, voiceChannel) {
   const newAutoState = !vcData.IsPAYG;
 
   try {
-    // Update database
-    vcData.IsPAYG = newAutoState;
-
     if (newAutoState) {
-      // Switching to PAYG mode - clear expiry
+      // Switching FROM Prepaid TO PAYG mode - clear expiry and enable billing
+      vcData.IsPAYG = true;
       vcData.ExpiresAt = null;
       vcData.PaidDuration = 0;
+      vcData.ActiveSince = new Date(); // Start billing from now
+      await vcData.save();
+
+      await interaction.reply({
+        embeds: [
+          new Discord.EmbedBuilder()
+            .setDescription(
+              `🟢 **Auto-renewal (PAYG) enabled!**\n\n` +
+                `Billing starts now at **60 coins/min**.\n` +
+                `You'll be warned when balance is low.`
+            )
+            .setColor("#00FF00"),
+        ],
+        flags: Discord.MessageFlags.Ephemeral,
+      });
+    } else {
+      // Switching FROM PAYG TO Prepaid - calculate final bill and give 2-minute grace period
+      const pvcConfig = require("../../database/models/pvcConfig");
+      const pvcEconomy = require("../../database/models/pvcEconomy");
+
+      const config = await pvcConfig.findOne({ Guild: interaction.guild.id });
+      const paygRate = config?.PAYGPerMinute || 60;
+
+      // Calculate time used
+      const activeSince = vcData.ActiveSince || vcData.CreatedAt;
+      const now = new Date();
+      const elapsed = now - activeSince.getTime();
+      const minutesElapsed = Math.floor(elapsed / (1000 * 60));
+      const totalCost = minutesElapsed * paygRate;
+
+      // Get user's balance
+      const userData = await pvcEconomy.findOne({
+        Guild: interaction.guild.id,
+        User: interaction.user.id,
+      });
+
+      const balance = userData ? userData.Coins : 0;
+
+      if (balance < totalCost) {
+        return interaction.reply({
+          embeds: [
+            new Discord.EmbedBuilder()
+              .setDescription(
+                `❌ **Insufficient balance!**\n\n` +
+                  `You used **${minutesElapsed} minutes** = **${totalCost.toLocaleString()} coins**\n` +
+                  `Your balance: **${balance.toLocaleString()} coins**\n\n` +
+                  `You need **${(
+                    totalCost - balance
+                  ).toLocaleString()}** more coins to convert to prepaid.`
+              )
+              .setColor("#FF0000"),
+          ],
+          flags: Discord.MessageFlags.Ephemeral,
+        });
+      }
+
+      // Deduct coins
+      userData.Coins -= totalCost;
+      userData.TotalSpent += totalCost;
+      await userData.save();
+
+      vcData.CoinsSpent += totalCost;
+
+      // Convert to prepaid with 2-minute grace period
+      vcData.IsPAYG = false;
+      vcData.ExpiresAt = new Date(Date.now() + 2 * 60 * 1000); // 2 minutes from now
+      vcData.PaidDuration = 2;
+      vcData.ActiveSince = null; // Stop PAYG billing
+      await vcData.save();
+
+      await interaction.reply({
+        embeds: [
+          new Discord.EmbedBuilder()
+            .setDescription(
+              `🔴 **PAYG disabled - Converted to Prepaid!**\n\n` +
+                `**Session Summary:**\n` +
+                `⏱️ Time used: **${minutesElapsed} minutes**\n` +
+                `💰 Total cost: **${totalCost.toLocaleString()} coins** (deducted)\n` +
+                `💵 Remaining balance: **${userData.Coins.toLocaleString()} coins**\n\n` +
+                `⚠️ **Grace Period: 2 minutes**\n` +
+                `Use **!extend** or the **Extend** button to add more time, or your VC will be deleted in **2 minutes**!`
+            )
+            .setColor("#FFA500")
+            .setFooter({ text: "Don't forget to extend!" }),
+        ],
+        flags: Discord.MessageFlags.Ephemeral,
+      });
     }
-
-    await vcData.save();
-
-    await interaction.reply({
-      embeds: [
-        new Discord.EmbedBuilder()
-          .setDescription(
-            `${newAutoState ? "🟢" : "🔴"} Auto-renewal (PAYG) ${
-              newAutoState ? "enabled" : "disabled"
-            }!\n\n` +
-              (newAutoState
-                ? "**60 coins/min** will be deducted while members are in your VC.\nYou'll be kicked when balance reaches 0."
-                : "Your VC will expire when the paid time runs out.\nUse **Extend** to add more time.")
-          )
-          .setColor(newAutoState ? "#00FF00" : "#FFA500"),
-      ],
-      flags: Discord.MessageFlags.Ephemeral,
-    });
   } catch (err) {
     console.error("Error toggling auto-renewal:", err);
     return interaction.reply({

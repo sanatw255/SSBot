@@ -14,6 +14,8 @@ const Schema = new mongoose.Schema({
   PaidDuration: { type: Number, default: 0 }, // Duration in minutes (0 if PAYG)
   CoinsSpent: { type: Number, default: 0 }, // Total coins spent on this VC
   LastPAYGDeduction: { type: Date, default: null }, // Last time PAYG was deducted
+  ActiveSince: { type: Date, default: null }, // When billing started (for PAYG)
+  EmptySince: { type: Date, default: null }, // When VC became empty (all members left)
 });
 
 // Create indexes for faster queries
