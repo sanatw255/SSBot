@@ -2,6 +2,16 @@ const Discord = require("discord.js");
 const pvcConfig = require("../../database/models/pvcConfig");
 
 module.exports = async (client, interaction, args) => {
+  const perms = await client.checkUserPerms(
+    {
+      flags: [Discord.PermissionsBitField.Flags.ManageGuild],
+      perms: [Discord.PermissionsBitField.Flags.ManageGuild],
+    },
+    interaction
+  );
+
+  if (perms == false) return;
+
   const coins = interaction.options.getInteger("coins");
 
   try {
