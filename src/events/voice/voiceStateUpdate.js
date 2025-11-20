@@ -36,6 +36,16 @@ module.exports = async (client, oldState, newState) => {
           const memberCount = channel?.members.size || 0;
 
           if (memberCount < 1 || memberCount == 0) {
+            // Check if this is a PVC channel (has ExpiresAt or IsPAYG)
+            const isPVC = data2.ExpiresAt || data2.IsPAYG;
+            
+            if (isPVC) {
+              // Don't delete PVC channels when empty - let the timer handle it
+              console.log(`[VC] PVC channel ${channel?.name} is empty but has active timer, not deleting`);
+              return;
+            }
+
+            // Only delete J2C channels when empty
             if (data.ChannelCount) {
               try {
                 data.ChannelCount -= 1;
@@ -78,29 +88,41 @@ module.exports = async (client, oldState, newState) => {
               const memberCount = channel?.members.size || 0;
 
               if (memberCount < 1 || memberCount == 0) {
-                if (data.ChannelCount) {
-                  try {
-                    data.ChannelCount -= 1;
-                    await data.save();
-                  } catch (e) {
-                    console.error("Error saving channel count:", e);
+                // Check if this is a PVC channel (has ExpiresAt or IsPAYG)
+                const isPVC = oldChannelData.ExpiresAt || oldChannelData.IsPAYG;
+                
+                if (isPVC) {
+                  // Don't delete PVC channels when empty - let the timer handle it
+                  console.log(`[VC] PVC channel ${channel?.name} is empty but has active timer, not deleting`);
+                } else {
+                  // Only delete J2C channels when empty
+                  if (data.ChannelCount) {
+                    try {
+                      data.ChannelCount -= 1;
+                      await data.save();
+                    } catch (e) {
+                      console.error("Error saving channel count:", e);
+                    }
                   }
-                }
 
-                try {
-                  await channelSchema.deleteOne({
-                    Channel: oldState.channelId,
-                  });
-                  if (oldState.channel) {
-                    await oldState.channel
-                      .delete()
-                      .catch((e) =>
-                        console.error("Error deleting channel:", e)
-                      );
+                  try {
+                    await channelSchema.deleteOne({
+                      Channel: oldState.channelId,
+                    });
+                    if (oldState.channel) {
+                      await oldState.channel
+                        .delete()
+                        .catch((e) =>
+                          console.error("Error deleting channel:", e)
+                        );
+                    }
+                  } catch (e) {
+                    console.error("Error in channel cleanup:", e);
                   }
-                } catch (e) {
-                  console.error("Error in old channel cleanup:", e);
                 }
+              } catch (e) {
+                console.error("Error in old channel cleanup:", e);
+              }
               }
             } catch (e) {
               console.error("Error processing old channel data:", e);
