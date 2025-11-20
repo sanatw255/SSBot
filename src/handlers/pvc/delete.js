@@ -1,6 +1,7 @@
 const Discord = require("discord.js");
 const voiceChannels = require("../../database/models/voiceChannels");
 const voiceSchema = require("../../database/models/voice");
+const cooldowns = require("./cooldowns");
 
 module.exports = async (client, message, args) => {
   if (message.author.bot) return;
@@ -61,6 +62,9 @@ module.exports = async (client, message, args) => {
     // Delete VC
     await voiceChannel.delete("Owner manually deleted VC").catch(() => {});
     await voiceChannels.deleteOne({ _id: vcData._id });
+
+    // Clear rename cooldown
+    cooldowns.clearCooldown(vcData.Channel);
 
     // Update channel count
     const voiceData = await voiceSchema.findOne({ Guild: message.guild.id });

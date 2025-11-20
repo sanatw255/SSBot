@@ -2,6 +2,7 @@ const Discord = require("discord.js");
 const voiceChannels = require("../../database/models/voiceChannels");
 const pvcEconomy = require("../../database/models/pvcEconomy");
 const pvcConfig = require("../../database/models/pvcConfig");
+const cooldowns = require("../pvc/cooldowns");
 
 module.exports = async (client, interaction) => {
   // Skip if called during bot initialization
@@ -382,6 +383,9 @@ async function handleRenameModal(client, interaction, vcData, voiceChannel) {
   try {
     await voiceChannel.setName(newName);
 
+    // Set cooldown after successful rename
+    cooldowns.setRenameCooldown(voiceChannel.id);
+
     await interaction.reply({
       embeds: [
         new Discord.EmbedBuilder()
@@ -396,14 +400,35 @@ async function handleRenameModal(client, interaction, vcData, voiceChannel) {
     });
   } catch (err) {
     console.error("Error renaming VC:", err);
-    return interaction.reply({
-      embeds: [
-        new Discord.EmbedBuilder()
-          .setDescription("❌ Failed to rename channel!")
-          .setColor("#FF0000"),
-      ],
-      flags: Discord.MessageFlags.Ephemeral,
-    });
+
+    // Check if it's a rate limit error
+    if (err.code === 50035 || err.message?.includes("rate limit")) {
+      return interaction
+        .reply({
+          embeds: [
+            new Discord.EmbedBuilder()
+              .setDescription(
+                "❌ **Rate Limit Exceeded!**\n\n" +
+                  "Discord limits channel name changes to **2 per 10 minutes**.\n" +
+                  "Please wait a few minutes before renaming again."
+              )
+              .setColor("#FFA500"),
+          ],
+          flags: Discord.MessageFlags.Ephemeral,
+        })
+        .catch(() => {});
+    }
+
+    return interaction
+      .reply({
+        embeds: [
+          new Discord.EmbedBuilder()
+            .setDescription("❌ Failed to rename channel! Try again later.")
+            .setColor("#FF0000"),
+        ],
+        flags: Discord.MessageFlags.Ephemeral,
+      })
+      .catch(() => {});
   }
 }
 

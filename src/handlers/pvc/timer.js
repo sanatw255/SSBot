@@ -3,6 +3,7 @@ const voiceChannels = require("../../database/models/voiceChannels");
 const pvcEconomy = require("../../database/models/pvcEconomy");
 const pvcConfig = require("../../database/models/pvcConfig");
 const voiceSchema = require("../../database/models/voice");
+const cooldowns = require("./cooldowns");
 
 /**
  * PVC Timer System
@@ -27,6 +28,7 @@ module.exports = async (client) => {
           if (!voiceChannel) {
             // Channel doesn't exist, remove from database
             await voiceChannels.deleteOne({ _id: vcData._id });
+            cooldowns.clearCooldown(vcData.Channel);
             continue;
           }
 
@@ -68,6 +70,7 @@ module.exports = async (client) => {
 
                 // Delete from database
                 await voiceChannels.deleteOne({ _id: vcData._id });
+                cooldowns.clearCooldown(vcData.Channel);
 
                 // Update channel count
                 const voiceData = await voiceSchema.findOne({
@@ -196,6 +199,7 @@ module.exports = async (client) => {
 
                   // Delete from database
                   await voiceChannels.deleteOne({ _id: vcData._id });
+                  cooldowns.clearCooldown(vcData.Channel);
 
                   // Update channel count
                   const voiceData = await voiceSchema.findOne({
@@ -240,6 +244,7 @@ module.exports = async (client) => {
               try {
                 await voiceChannel.delete("PAYG VC empty for 2+ minutes");
                 await voiceChannels.deleteOne({ _id: vcData._id });
+                cooldowns.clearCooldown(vcData.Channel);
 
                 // Update channel count
                 const voiceData = await voiceSchema.findOne({

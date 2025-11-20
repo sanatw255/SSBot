@@ -2,6 +2,7 @@ const Discord = require("discord.js");
 const voiceChannels = require("../../database/models/voiceChannels");
 const pvcEconomy = require("../../database/models/pvcEconomy");
 const pvcConfig = require("../../database/models/pvcConfig");
+const cooldowns = require("../pvc/cooldowns");
 
 module.exports = async (client, interaction) => {
   // Skip if called during bot initialization
@@ -502,6 +503,26 @@ async function handleUninvite(client, interaction, vcData, voiceChannel) {
 }
 
 async function handleRename(client, interaction, vcData, voiceChannel) {
+  // Check cooldown (Discord limits: 2 renames per 10 minutes)
+  const channelId = voiceChannel.id;
+  const cooldownCheck = cooldowns.canRename(channelId);
+
+  if (!cooldownCheck.allowed) {
+    const minutesLeft = Math.ceil(cooldownCheck.timeLeft / 60000);
+    return interaction.reply({
+      embeds: [
+        new Discord.EmbedBuilder()
+          .setDescription(
+            `⏱️ **Cooldown Active**\n\n` +
+              `Discord limits channel renames to **2 per 10 minutes**.\n` +
+              `Please wait **${minutesLeft} minute(s)** before renaming again.`
+          )
+          .setColor("#FFA500"),
+      ],
+      flags: Discord.MessageFlags.Ephemeral,
+    });
+  }
+
   // Show modal for new name input
   const modal = new Discord.ModalBuilder()
     .setCustomId("pvcRenameModal")
@@ -682,6 +703,7 @@ async function handleDeleteVC(client, interaction, vcData, voiceChannel) {
           Guild: vcData.Guild,
           Owner: vcData.Owner,
         });
+        cooldowns.clearCooldown(vcData.Channel);
 
         await i.update({
           embeds: [

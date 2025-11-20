@@ -1,6 +1,7 @@
 const Discord = require("discord.js");
 const voiceChannels = require("../../database/models/voiceChannels");
 const pvcConfig = require("../../database/models/pvcConfig");
+const cooldowns = require("./cooldowns");
 
 module.exports = async (client, message, args) => {
   if (message.author.bot) return;
@@ -64,6 +65,27 @@ module.exports = async (client, message, args) => {
       return message.reply("❌ Your VC no longer exists!").catch(() => {});
     }
 
+    // Check cooldown
+    const cooldownCheck = cooldowns.canRename(voiceChannel.id);
+    if (!cooldownCheck.allowed) {
+      const minutesLeft = Math.ceil(cooldownCheck.timeLeft / 60000);
+      const embed = new Discord.EmbedBuilder()
+        .setColor("#FFA500")
+        .setTitle("⏱️ Cooldown Active")
+        .setDescription(
+          `Discord limits channel renames to **2 per 10 minutes**.\n\n` +
+            `Please wait **${minutesLeft} minute(s)** before renaming again.`
+        )
+        .setFooter({
+          text: message.guild.name,
+          iconURL: message.guild.iconURL(),
+        });
+
+      return message.reply({ embeds: [embed] }).then((msg) => {
+        setTimeout(() => msg.delete().catch(() => {}), 10000);
+      });
+    }
+
     // Get new name (join all args after command)
     const newName = args.slice(1).join(" ");
 
@@ -87,6 +109,9 @@ module.exports = async (client, message, args) => {
     // Rename the channel
     await voiceChannel.setName(newName);
 
+    // Set cooldown after successful rename
+    cooldowns.setRenameCooldown(voiceChannel.id);
+
     const embed = new Discord.EmbedBuilder()
       .setColor("#00FF00")
       .setTitle("✅ VC Renamed!")
@@ -101,6 +126,26 @@ module.exports = async (client, message, args) => {
     message.reply({ embeds: [embed] });
   } catch (err) {
     console.error("Error in PVC rename command:", err);
-    message.reply("❌ Error renaming VC.").catch(() => {});
+
+    // Check if it's a rate limit error
+    if (err.code === 50035 || err.message?.includes("rate limit")) {
+      const rateLimitEmbed = new Discord.EmbedBuilder()
+        .setColor("#FFA500")
+        .setTitle("⏱️ Rate Limit Exceeded!")
+        .setDescription(
+          "Discord limits channel name changes to **2 per 10 minutes**.\n\n" +
+            "Please wait a few minutes before renaming again."
+        )
+        .setFooter({
+          text: message.guild.name,
+          iconURL: message.guild.iconURL(),
+        });
+
+      return message.reply({ embeds: [rateLimitEmbed] }).catch(() => {});
+    }
+
+    message
+      .reply("❌ Error renaming VC. Please try again later.")
+      .catch(() => {});
   }
 };
