@@ -234,39 +234,92 @@ module.exports = async (client, oldState, newState) => {
               const memberCount = channel?.members.size || 0;
 
               if (memberCount < 1 || memberCount == 0) {
-                // Check if this is a PVC channel
-                const isPVC = oldChannelData.ExpiresAt || oldChannelData.IsPAYG;
+                // Check if this is a PAYG channel
+                const isPAYG = oldChannelData.IsPAYG;
 
-                if (isPVC) {
-                  // Let the timer handle PVC/PAYG deletion
-                  console.log(
-                    `[VC] PVC/PAYG channel ${channel?.name} is empty, timer will handle deletion`
-                  );
-                } else {
-                  // Only delete non-PVC channels immediately
-                  if (data.ChannelCount) {
-                    try {
-                      data.ChannelCount -= 1;
-                      await data.save();
-                    } catch (e) {
-                      console.error("Error saving channel count:", e);
-                    }
-                  }
-
+                if (isPAYG) {
+                  // Handle PAYG VC deletion immediately with session summary
                   try {
-                    await channelSchema.deleteOne({
-                      Channel: oldState.channelId,
+                    const pvcEconomy = require("../../database/models/pvcEconomy");
+                    const pvcConfig = require("../../database/models/pvcConfig");
+
+                    const activeSince =
+                      oldChannelData.ActiveSince || oldChannelData.CreatedAt;
+                    const now = new Date();
+                    const elapsed = now - activeSince;
+                    const minutesElapsed = Math.floor(elapsed / (1000 * 60));
+                    const totalSpent = oldChannelData.CoinsSpent || 0;
+
+                    // Get owner's current balance
+                    const userData = await pvcEconomy.findOne({
+                      Guild: guildID,
+                      User: oldChannelData.Owner,
                     });
-                    if (oldState.channel) {
-                      await oldState.channel
-                        .delete()
-                        .catch((e) =>
-                          console.error("Error deleting channel:", e)
+                    const currentBalance = userData?.Coins || 0;
+
+                    // Send billing summary to owner
+                    const owner = await client.users
+                      .fetch(oldChannelData.Owner)
+                      .catch(() => null);
+                    if (owner) {
+                      const summaryEmbed = new Discord.EmbedBuilder()
+                        .setColor("#00FF00")
+                        .setTitle("📊 Your VC Session Ended")
+                        .setDescription(
+                          `Your Pay-As-You-Go voice channel **${
+                            channel?.name || "your VC"
+                          }** has been deleted because it was empty.\n\n` +
+                            `📊 **Session Summary:**\n` +
+                            `⏱️ Duration: **${minutesElapsed} minutes**\n` +
+                            `💰 Total Cost: **${totalSpent.toLocaleString()} coins**\n` +
+                            `💵 Current Balance: **${currentBalance.toLocaleString()} coins**\n\n` +
+                            `Join the J2C channel to create a new PAYG VC!`
+                        )
+                        .setTimestamp();
+
+                      try {
+                        await owner.send({ embeds: [summaryEmbed] });
+                        console.log(
+                          `[PAYG] Sent session summary DM to ${owner.tag}`
                         );
+                      } catch (e) {
+                        console.log(
+                          `[PAYG] Could not DM ${owner.tag}: ${e.message}`
+                        );
+                      }
                     }
-                  } catch (e) {
-                    console.error("Error in channel cleanup:", e);
+
+                    console.log(
+                      `[PAYG] Deleted empty VC: ${channel?.name} (Duration: ${minutesElapsed}min, Cost: ${totalSpent})`
+                    );
+                  } catch (err) {
+                    console.error("[PAYG] Error sending session summary:", err);
                   }
+                }
+
+                // Delete the channel (PAYG or regular J2C)
+                if (data.ChannelCount) {
+                  try {
+                    data.ChannelCount -= 1;
+                    await data.save();
+                  } catch (e) {
+                    console.error("Error saving channel count:", e);
+                  }
+                }
+
+                try {
+                  await channelSchema.deleteOne({
+                    Channel: oldState.channelId,
+                  });
+                  if (oldState.channel) {
+                    await oldState.channel
+                      .delete()
+                      .catch((e) =>
+                        console.error("Error deleting channel:", e)
+                      );
+                  }
+                } catch (e) {
+                  console.error("Error in channel cleanup:", e);
                 }
               }
             } catch (e) {
