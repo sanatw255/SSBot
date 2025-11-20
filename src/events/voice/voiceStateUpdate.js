@@ -234,28 +234,39 @@ module.exports = async (client, oldState, newState) => {
               const memberCount = channel?.members.size || 0;
 
               if (memberCount < 1 || memberCount == 0) {
-                if (data.ChannelCount) {
-                  try {
-                    data.ChannelCount -= 1;
-                    await data.save();
-                  } catch (e) {
-                    console.error("Error saving channel count:", e);
-                  }
-                }
+                // Check if this is a PVC channel
+                const isPVC = oldChannelData.ExpiresAt || oldChannelData.IsPAYG;
 
-                try {
-                  await channelSchema.deleteOne({
-                    Channel: oldState.channelId,
-                  });
-                  if (oldState.channel) {
-                    await oldState.channel
-                      .delete()
-                      .catch((e) =>
-                        console.error("Error deleting channel:", e)
-                      );
+                if (isPVC) {
+                  // Let the timer handle PVC/PAYG deletion
+                  console.log(
+                    `[VC] PVC/PAYG channel ${channel?.name} is empty, timer will handle deletion`
+                  );
+                } else {
+                  // Only delete non-PVC channels immediately
+                  if (data.ChannelCount) {
+                    try {
+                      data.ChannelCount -= 1;
+                      await data.save();
+                    } catch (e) {
+                      console.error("Error saving channel count:", e);
+                    }
                   }
-                } catch (e) {
-                  console.error("Error in channel cleanup:", e);
+
+                  try {
+                    await channelSchema.deleteOne({
+                      Channel: oldState.channelId,
+                    });
+                    if (oldState.channel) {
+                      await oldState.channel
+                        .delete()
+                        .catch((e) =>
+                          console.error("Error deleting channel:", e)
+                        );
+                    }
+                  } catch (e) {
+                    console.error("Error in channel cleanup:", e);
+                  }
                 }
               }
             } catch (e) {

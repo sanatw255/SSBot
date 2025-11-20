@@ -279,9 +279,13 @@ module.exports = async (client) => {
               // Get session stats (coins already deducted, just calculate duration)
               const activeSince = vcData.ActiveSince || vcData.CreatedAt;
               const now = new Date();
-              const elapsed = now - activeSince.getTime();
+              const elapsed = now - activeSince; // activeSince is already a Date object
               const minutesElapsed = Math.floor(elapsed / (1000 * 60));
               const totalSpent = vcData.CoinsSpent || 0; // Already deducted
+              
+              console.log(
+                `[PVC PAYG] Processing empty VC deletion for ${voiceChannel.name} (Duration: ${minutesElapsed}min, Cost: ${totalSpent})`
+              );
 
               // Get owner's current balance
               const userData = await pvcEconomy.findOne({
@@ -312,7 +316,13 @@ module.exports = async (client) => {
 
                 try {
                   await owner.send({ embeds: [summaryEmbed] });
+                  console.log(
+                    `[PVC PAYG] Sent session summary DM to ${owner.user.tag}`
+                  );
                 } catch (e) {
+                  console.log(
+                    `[PVC PAYG] Could not DM ${owner.user.tag}, trying commands channel. Error: ${e.message}`
+                  );
                   // Can't DM user, try posting in commands channel
                   const config = await pvcConfig.findOne({
                     Guild: vcData.Guild,
