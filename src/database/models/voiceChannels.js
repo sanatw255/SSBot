@@ -16,6 +16,7 @@ const Schema = new mongoose.Schema({
   LastPAYGDeduction: { type: Date, default: null }, // Last time PAYG was deducted
   ActiveSince: { type: Date, default: null }, // When billing started (for PAYG)
   EmptySince: { type: Date, default: null }, // When VC became empty (all members left)
+  PAYGWarningGiven: { type: Boolean, default: false }, // Whether low balance warning was sent
 });
 
 // Create indexes for faster queries

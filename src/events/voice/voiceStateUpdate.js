@@ -40,33 +40,35 @@ module.exports = async (client, oldState, newState) => {
             const isPVC = data2.ExpiresAt || data2.IsPAYG;
 
             if (isPVC) {
-              // Don't delete PVC channels when empty - let the timer handle it
+              // Let the timer handle PVC/PAYG deletion
               console.log(
-                `[VC] PVC channel ${channel?.name} is empty but has active timer, not deleting`
+                `[VC] PVC/PAYG channel ${channel?.name} is empty, timer will handle deletion`
               );
-              return;
+              // Don't return here - timer will handle it
             }
 
-            // Only delete J2C channels when empty
-            if (data.ChannelCount) {
+            // Only delete non-PVC J2C channels when empty immediately
+            if (!isPVC) {
+              if (data.ChannelCount) {
+                try {
+                  data.ChannelCount -= 1;
+                  await data.save();
+                } catch (e) {
+                  console.error("Error saving channel count:", e);
+                }
+              }
+
               try {
-                data.ChannelCount -= 1;
-                await data.save();
+                await channelSchema.deleteOne({ Channel: oldState.channelId });
+                if (oldState.channel) {
+                  await oldState.channel
+                    .delete()
+                    .catch((e) => console.error("Error deleting channel:", e));
+                }
               } catch (e) {
-                console.error("Error saving channel count:", e);
+                console.error("Error in channel cleanup:", e);
               }
-            }
-
-            try {
-              await channelSchema.deleteOne({ Channel: oldState.channelId });
-              if (oldState.channel) {
-                await oldState.channel
-                  .delete()
-                  .catch((e) => console.error("Error deleting channel:", e));
-              }
-            } catch (e) {
-              console.error("Error in channel cleanup:", e);
-            }
+            } // End of !isPVC check
           }
         } catch (e) {
           console.error("Error processing old channel:", e);
@@ -94,12 +96,13 @@ module.exports = async (client, oldState, newState) => {
                 const isPVC = oldChannelData.ExpiresAt || oldChannelData.IsPAYG;
 
                 if (isPVC) {
-                  // Don't delete PVC channels when empty - let the timer handle it
+                  // Let the timer handle PVC/PAYG deletion
                   console.log(
-                    `[VC] PVC channel ${channel?.name} is empty but has active timer, not deleting`
+                    `[VC] PVC/PAYG channel ${channel?.name} is empty, timer will handle deletion`
                   );
+                  // Don't delete here
                 } else {
-                  // Only delete J2C channels when empty
+                  // Only delete non-PVC J2C channels when empty immediately
                   if (data.ChannelCount) {
                     try {
                       data.ChannelCount -= 1;

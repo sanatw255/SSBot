@@ -274,108 +274,85 @@ module.exports = async (client) => {
 
           // Check if PAYG VC is empty (all members left)
           if (vcData.IsPAYG && memberCount === 0) {
-            // Set EmptySince if not already set
-            if (!vcData.EmptySince) {
-              vcData.EmptySince = new Date();
-              await vcData.save();
-            }
+            // Delete immediately when empty
+            try {
+              // Get session stats (coins already deducted, just calculate duration)
+              const activeSince = vcData.ActiveSince || vcData.CreatedAt;
+              const now = new Date();
+              const elapsed = now - activeSince.getTime();
+              const minutesElapsed = Math.floor(elapsed / (1000 * 60));
+              const totalSpent = vcData.CoinsSpent || 0; // Already deducted
 
-            // Wait 2 minutes after becoming empty before deleting
-            const timeSinceEmpty =
-              (new Date() - vcData.EmptySince) / (1000 * 60);
-            if (timeSinceEmpty >= 2) {
-              try {
-                // Calculate final billing before deletion
-                const activeSince = vcData.ActiveSince || vcData.CreatedAt;
-                const now = new Date();
-                const elapsed = now - activeSince.getTime();
-                const minutesElapsed = Math.floor(elapsed / (1000 * 60));
-                const sessionCost = minutesElapsed * config.PAYGPerMinute;
+              // Get owner's current balance
+              const userData = await pvcEconomy.findOne({
+                Guild: vcData.Guild,
+                User: vcData.Owner,
+              });
 
-                // Deduct final amount from owner
-                const pvcEconomy = require("../../database/models/pvcEconomy");
-                const userData = await pvcEconomy.findOne({
-                  Guild: vcData.Guild,
-                  User: vcData.Owner,
-                });
+              const currentBalance = userData?.Coins || 0;
 
-                let currentBalance = 0;
-                if (userData && sessionCost > 0) {
-                  userData.Coins = Math.max(0, userData.Coins - sessionCost);
-                  userData.TotalSpent += sessionCost;
-                  await userData.save();
+              // Send billing summary to owner
+              const owner = await guild.members
+                .fetch(vcData.Owner)
+                .catch(() => null);
 
-                  vcData.CoinsSpent += sessionCost;
-                  await vcData.save();
+              if (owner) {
+                const summaryEmbed = new Discord.EmbedBuilder()
+                  .setColor("#00FF00")
+                  .setTitle("📊 Your VC Session Ended")
+                  .setDescription(
+                    `Your Pay-As-You-Go voice channel **${voiceChannel.name}** has been deleted because it was empty.\n\n` +
+                      `📊 **Session Summary:**\n` +
+                      `⏱️ Duration: **${minutesElapsed} minutes**\n` +
+                      `💰 Total Cost: **${totalSpent.toLocaleString()} coins**\n` +
+                      `💵 Current Balance: **${currentBalance.toLocaleString()} coins**\n\n` +
+                      `Join the J2C channel to create a new PAYG VC!`
+                  )
+                  .setTimestamp();
 
-                  currentBalance = userData.Coins;
-                } else if (userData) {
-                  currentBalance = userData.Coins;
-                }
-
-                // Send billing summary to owner
-                const owner = await guild.members
-                  .fetch(vcData.Owner)
-                  .catch(() => null);
-
-                if (owner) {
-                  const summaryEmbed = new Discord.EmbedBuilder()
-                    .setColor("#FFA500")
-                    .setTitle("📊 PAYG VC Session Ended")
-                    .setDescription(
-                      `Your Pay-As-You-Go voice channel **${voiceChannel.name}** was automatically deleted after being empty for 2 minutes.\n\n` +
-                        `📊 **Session Summary:**\n` +
-                        `⏱️ Duration: **${minutesElapsed} minutes**\n` +
-                        `💰 Total Cost: **${sessionCost.toLocaleString()} coins**\n` +
-                        `💵 Current Balance: **${currentBalance.toLocaleString()} coins**\n\n` +
-                        `Use \`!j2c\` to create a new PAYG VC!`
-                    )
-                    .setTimestamp();
-
-                  try {
-                    await owner.send({ embeds: [summaryEmbed] });
-                  } catch (e) {
-                    // Can't DM user, try posting in commands channel
-                    if (config?.CommandsChannel) {
-                      const commandsChannel = guild.channels.cache.get(
-                        config.CommandsChannel
-                      );
-                      if (commandsChannel) {
-                        await commandsChannel
-                          .send({
-                            content: `${owner}`,
-                            embeds: [summaryEmbed],
-                          })
-                          .catch(() => {});
-                      }
+                try {
+                  await owner.send({ embeds: [summaryEmbed] });
+                } catch (e) {
+                  // Can't DM user, try posting in commands channel
+                  const config = await pvcConfig.findOne({
+                    Guild: vcData.Guild,
+                  });
+                  if (config?.CommandsChannel) {
+                    const commandsChannel = guild.channels.cache.get(
+                      config.CommandsChannel
+                    );
+                    if (commandsChannel) {
+                      await commandsChannel
+                        .send({
+                          content: `${owner}`,
+                          embeds: [summaryEmbed],
+                        })
+                        .catch(() => {});
                     }
                   }
                 }
-
-                await voiceChannel.delete("PAYG VC empty for 2+ minutes");
-                await voiceChannels.deleteOne({ _id: vcData._id });
-                cooldowns.clearCooldown(vcData.Channel);
-
-                // Update channel count
-                const voiceData = await voiceSchema.findOne({
-                  Guild: vcData.Guild,
-                });
-                if (voiceData && voiceData.ChannelCount > 0) {
-                  voiceData.ChannelCount -= 1;
-                  await voiceData.save();
-                }
-
-                console.log(
-                  `[PVC PAYG] Deleted empty PAYG VC: ${voiceChannel.name} (Final cost: ${sessionCost} coins)`
-                );
-              } catch (err) {
-                console.error(`[PVC PAYG] Error deleting empty VC:`, err);
               }
+
+              // Delete VC
+              await voiceChannel.delete("PAYG VC empty - all users left");
+              await voiceChannels.deleteOne({ _id: vcData._id });
+              cooldowns.clearCooldown(vcData.Channel);
+
+              // Update channel count
+              const voiceData = await voiceSchema.findOne({
+                Guild: vcData.Guild,
+              });
+              if (voiceData && voiceData.ChannelCount > 0) {
+                voiceData.ChannelCount -= 1;
+                await voiceData.save();
+              }
+
+              console.log(
+                `[PVC PAYG] Deleted empty PAYG VC: ${voiceChannel.name} (Total cost: ${totalSpent} coins, Duration: ${minutesElapsed}min)`
+              );
+            } catch (err) {
+              console.error(`[PVC PAYG] Error deleting empty VC:`, err);
             }
-          } else if (vcData.IsPAYG && memberCount > 0 && vcData.EmptySince) {
-            // VC was empty but someone joined - clear EmptySince
-            vcData.EmptySince = null;
-            await vcData.save();
           }
         } catch (err) {
           console.error(`[PVC Timer] Error processing VC:`, err);
