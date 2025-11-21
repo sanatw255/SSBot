@@ -135,5 +135,3 @@ function isConnected() {
 
 module.exports = connect;
 module.exports.isConnected = isConnected;
-
-module.exports = connect;
