@@ -71,8 +71,8 @@ module.exports = async (client, message, args) => {
       });
     }
 
-    // Get amount from args
-    const amount = parseInt(args[1]);
+    // Get amount from args (args[0] = !give, args[1] = @mention, args[2] = amount)
+    const amount = parseInt(args[2]);
     if (!amount || isNaN(amount) || amount <= 0) {
       const embed = new Discord.EmbedBuilder()
         .setColor(client.config.colors.error || "#FF0000")
