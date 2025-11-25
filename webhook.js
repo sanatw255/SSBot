@@ -41,13 +41,19 @@ app.post("/payload", (req, res) => {
 
   console.log("✅ Valid webhook received!");
 
-  exec(
-    "cd ~/ssbot && git pull origin main && npm install && pm2 restart ssbot",
-    (err, stdout, stderr) => {
-      if (err) return console.error(`Error: ${err}`);
-      console.log(stdout || stderr);
+  // Use __dirname to get current directory (works cross-platform)
+  const isWindows = process.platform === "win32";
+  const command = isWindows
+    ? `cd /d "${__dirname}" && git pull origin main && npm install && taskkill /F /IM node.exe && start /B node . --trace-warnings`
+    : `cd ~/ssbot && git pull origin main && npm install && pm2 restart ssbot`;
+
+  exec(command, (err, stdout, stderr) => {
+    if (err) {
+      console.error(`❌ Webhook execution error: ${err.message}`);
+      return;
     }
-  );
+    console.log("📦 Output:", stdout || stderr);
+  });
 
   res.sendStatus(200);
 });
