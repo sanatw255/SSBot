@@ -9,16 +9,14 @@ module.exports = async (client, interaction, args) => {
     const channel = interaction.options.getChannel("channel")
 
     if (!channel) {
-      return await interaction.reply({
+      return await interaction.editReply({
         content: "❌ Please provide a valid channel!",
-        ephemeral: true,
       })
     }
 
     if (channel.type !== Discord.ChannelType.GuildText) {
-      return await interaction.reply({
+      return await interaction.editReply({
         content: "❌ Please provide a text channel!",
-        ephemeral: true,
       })
     }
 
@@ -38,12 +36,11 @@ module.exports = async (client, interaction, args) => {
     }
 
     const selectedModel = choices[choice]
-    if (!selectedModel) {
-      return await interaction.reply({
-        content: "❌ Invalid setup choice!",
-        ephemeral: true,
-      })
-    }
+      if (!selectedModel) {
+        return await interaction.editReply({
+          content: "❌ Invalid setup choice!",
+        })
+      }
 
     // Save to database
     await selectedModel.findOneAndUpdate(
@@ -61,7 +58,7 @@ module.exports = async (client, interaction, args) => {
       .setColor("#00FF00")
       .setTimestamp()
 
-    await interaction.reply({ embeds: [embed] })
+    await interaction.editReply({ embeds: [embed] })
 
     // Send test message to the channel
     const testEmbed = new Discord.EmbedBuilder()
@@ -73,21 +70,8 @@ module.exports = async (client, interaction, args) => {
     await channel.send({ embeds: [testEmbed] })
   } catch (error) {
     console.error("Setup logs error:", error)
-
-    if (!interaction.replied && !interaction.deferred) {
-      await interaction.reply({
-        content: "❌ An error occurred while setting up logs.",
-        ephemeral: true,
-      })
-    } else if (interaction.deferred) {
-      await interaction.editReply({
-        content: "❌ An error occurred while setting up logs.",
-      })
-    } else {
-      await interaction.followUp({
-        content: "❌ An error occurred while setting up logs.",
-        ephemeral: true,
-      })
-    }
+    await interaction.editReply({
+      content: "❌ An error occurred while setting up logs.",
+    }).catch(() => {})
   }
 }

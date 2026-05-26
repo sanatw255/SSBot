@@ -143,6 +143,7 @@ module.exports = async (client, message) => {
 
           // PVC Level-Up Rewards System
           let coinsEarned = 0;
+          let userEconomy = null;
           const pvcConfigData = await pvcConfig.findOne({
             Guild: message.guild.id,
           });
@@ -162,7 +163,7 @@ module.exports = async (client, message) => {
             }
 
             // Award coins to user
-            let userEconomy = await pvcEconomy.findOne({
+            userEconomy = await pvcEconomy.findOne({
               Guild: message.guild.id,
               User: message.author.id,
             });
