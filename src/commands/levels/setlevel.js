@@ -1,6 +1,7 @@
  const Discord = require("discord.js");
  const Functions = require("../../database/models/functions");
  const Schema = require("../../database/models/levels");
+ const levelRewards = require("../../database/models/levelRewards");
 
  module.exports = async (client, interaction, args) => {
    const data = await Functions.findOne({ Guild: interaction.guild.id });
@@ -46,6 +47,19 @@
          );
        }
 
+       // Assign role reward if one exists for this level
+       const rewardData = await levelRewards.findOne({
+         Guild: interaction.guild.id,
+         Level: level,
+       });
+
+       if (rewardData) {
+         const member = await interaction.guild.members.fetch(target.id).catch(() => null);
+         if (member) {
+           await member.roles.add(rewardData.Role).catch(console.error);
+         }
+       }
+
        client.succNormal(
          {
            text: `Level has been modified successfully`,
@@ -58,6 +72,11 @@
              {
                name: "👤┆User",
                value: `${target} (${target.tag})`,
+               inline: true,
+             },
+             {
+               name: "🎁┆Role Reward",
+               value: rewardData ? `<@&${rewardData.Role}> assigned!` : `None for level ${level}`,
                inline: true,
              },
            ],
