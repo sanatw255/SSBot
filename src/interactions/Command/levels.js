@@ -89,6 +89,22 @@ module.exports = {
       subcommand
         .setName("leaderboard")
         .setDescription("See the level leaderboard")
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName("resetuser")
+        .setDescription("Reset the XP and level of a specific user")
+        .addUserOption((option) =>
+          option
+            .setName("user")
+            .setDescription("Select a user to reset")
+            .setRequired(true)
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName("resetall")
+        .setDescription("Reset the XP and level of ALL users in this server")
     ),
 
   run: async (client, interaction, args) => {
