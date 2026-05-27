@@ -51,7 +51,28 @@ module.exports = async (client, interaction, args) => {
         time: 60000,
       })
       .then(async (i) => {
+        // ✅ Acknowledge the button interaction immediately (within 3s)
+        // so Discord doesn't show "interaction failed" while we do heavy work.
+        await i.deferUpdate();
+
         if (i.customId === "resetall_confirm") {
+          // Disable buttons while processing
+          const disabledRow = new Discord.ActionRowBuilder().addComponents(
+            new Discord.ButtonBuilder()
+              .setCustomId("resetall_confirm")
+              .setLabel("Resetting...")
+              .setEmoji("⏳")
+              .setStyle(Discord.ButtonStyle.Danger)
+              .setDisabled(true),
+            new Discord.ButtonBuilder()
+              .setCustomId("resetall_cancel")
+              .setLabel("Cancel")
+              .setEmoji("❌")
+              .setStyle(Discord.ButtonStyle.Secondary)
+              .setDisabled(true)
+          );
+          await interaction.editReply({ components: [disabledRow] });
+
           // Reset all users' XP and level to 0
           const result = await Schema.updateMany(
             { guildID: interaction.guild.id },
