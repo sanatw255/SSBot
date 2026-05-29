@@ -234,11 +234,21 @@ module.exports = async (client, oldState, newState) => {
               const memberCount = channel?.members.size || 0;
 
               if (memberCount < 1 || memberCount == 0) {
-                // Check if this is a PAYG channel
+                // Check channel type
                 const isPAYG = oldChannelData.IsPAYG;
+                const isPaidVC = !isPAYG && oldChannelData.ExpiresAt;
 
-                if (isPAYG) {
-                  // Handle PAYG VC deletion immediately with session summary
+                // Paid VCs (!create <duration>) must NOT be deleted on empty —
+                // the timer handles their expiry after the full duration.
+                // Friends should be able to stay in the channel even if the
+                // owner leaves, until the paid time runs out.
+                if (isPaidVC) {
+                  console.log(
+                    `[VC] Paid VC ${channel?.name} is empty but still has time remaining — timer will delete at expiry`
+                  );
+                  // Do nothing — let the timer in timer.js handle deletion
+                } else if (isPAYG) {
+                  // PAYG VC: empty → delete immediately with session summary
                   try {
                     const pvcEconomy = require("../../database/models/pvcEconomy");
                     const pvcConfig = require("../../database/models/pvcConfig");
@@ -295,31 +305,56 @@ module.exports = async (client, oldState, newState) => {
                   } catch (err) {
                     console.error("[PAYG] Error sending session summary:", err);
                   }
-                }
 
-                // Delete the channel (PAYG or regular J2C)
-                if (data.ChannelCount) {
+                  // Delete the PAYG channel
+                  if (data.ChannelCount) {
+                    try {
+                      data.ChannelCount -= 1;
+                      await data.save();
+                    } catch (e) {
+                      console.error("Error saving channel count:", e);
+                    }
+                  }
+
                   try {
-                    data.ChannelCount -= 1;
-                    await data.save();
+                    await channelSchema.deleteOne({
+                      Channel: oldState.channelId,
+                    });
+                    if (oldState.channel) {
+                      await oldState.channel
+                        .delete()
+                        .catch((e) =>
+                          console.error("Error deleting channel:", e)
+                        );
+                    }
                   } catch (e) {
-                    console.error("Error saving channel count:", e);
+                    console.error("Error in channel cleanup:", e);
                   }
-                }
+                } else {
+                  // Regular (non-PVC) J2C channel: delete immediately when empty
+                  if (data.ChannelCount) {
+                    try {
+                      data.ChannelCount -= 1;
+                      await data.save();
+                    } catch (e) {
+                      console.error("Error saving channel count:", e);
+                    }
+                  }
 
-                try {
-                  await channelSchema.deleteOne({
-                    Channel: oldState.channelId,
-                  });
-                  if (oldState.channel) {
-                    await oldState.channel
-                      .delete()
-                      .catch((e) =>
-                        console.error("Error deleting channel:", e)
-                      );
+                  try {
+                    await channelSchema.deleteOne({
+                      Channel: oldState.channelId,
+                    });
+                    if (oldState.channel) {
+                      await oldState.channel
+                        .delete()
+                        .catch((e) =>
+                          console.error("Error deleting channel:", e)
+                        );
+                    }
+                  } catch (e) {
+                    console.error("Error in channel cleanup:", e);
                   }
-                } catch (e) {
-                  console.error("Error in channel cleanup:", e);
                 }
               }
             } catch (e) {
