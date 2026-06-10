@@ -11,13 +11,17 @@ const rewards = require("../../database/models/inviteRewards");
  * Previously this used client.embed(options, channel) which is broken because
  * client.embed expects an interaction object (with .reply/.editReply), not a channel.
  */
-async function sendWelcome(channel, desc) {
+async function sendWelcome(client, channel, desc) {
   if (!channel) return;
   try {
     const embed = new EmbedBuilder()
       .setTitle(`👋・Welcome`)
       .setDescription(desc)
-      .setColor(0x5865f2)
+      .setColor(0xED4245) // Red color as requested
+      .setFooter({
+        text: client.config.discord.footer,
+        iconURL: client.user.avatarURL({ size: 1024 }),
+      })
       .setTimestamp();
     await channel.send({ embeds: [embed] });
   } catch (err) {
@@ -66,9 +70,10 @@ module.exports = async (client, member, invite, inviter) => {
     // Unknown inviter (joined via vanity, discovery, etc.)
     if (messageData && messageData.inviteJoin) {
       const msg = buildMessage(messageData.inviteJoin, member, null, "∞", "∞");
-      await sendWelcome(welcomeChannel, msg);
+      await sendWelcome(client, welcomeChannel, msg);
     } else {
       await sendWelcome(
+        client,
         welcomeChannel,
         `I cannot trace how **${member} | ${member.user.tag}** joined.`
       );
@@ -102,9 +107,10 @@ module.exports = async (client, member, invite, inviter) => {
         currentInvites,
         currentLeft
       );
-      await sendWelcome(welcomeChannel, msg);
+      await sendWelcome(client, welcomeChannel, msg);
     } else {
       await sendWelcome(
+        client,
         welcomeChannel,
         `**${member} | ${member.user.tag}** was invited by **${inviter.tag}** **(${currentInvites} invites)**`
       );
