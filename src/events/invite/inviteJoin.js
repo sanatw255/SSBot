@@ -1,4 +1,4 @@
-const discord = require("discord.js");
+const { EmbedBuilder } = require("discord.js");
 
 const invites = require("../../database/models/invites");
 const invitedBy = require("../../database/models/inviteBy");
@@ -6,261 +6,125 @@ const welcomeSchema = require("../../database/models/welcomeChannels");
 const messages = require("../../database/models/inviteMessages");
 const rewards = require("../../database/models/inviteRewards");
 
+/**
+ * Sends a welcome embed directly to a channel using channel.send().
+ * Previously this used client.embed(options, channel) which is broken because
+ * client.embed expects an interaction object (with .reply/.editReply), not a channel.
+ */
+async function sendWelcome(channel, desc) {
+  if (!channel) return;
+  try {
+    const embed = new EmbedBuilder()
+      .setTitle(`👋・Welcome`)
+      .setDescription(desc)
+      .setColor(0x5865f2)
+      .setTimestamp();
+    await channel.send({ embeds: [embed] });
+  } catch (err) {
+    console.error("Error sending welcome message to channel:", err);
+  }
+}
+
+/**
+ * Replaces all {placeholder} tokens in a message string.
+ */
+function buildMessage(template, member, inviterObj, inviteCount, leftCount) {
+  let msg = template;
+
+  // User tokens
+  msg = msg.replace(`{user:username}`, member.user.username);
+  msg = msg.replace(`{user:discriminator}`, member.user.discriminator);
+  msg = msg.replace(`{user:tag}`, member.user.tag);
+  msg = msg.replace(`{user:mention}`, `${member}`);
+
+  // Inviter tokens
+  msg = msg.replace(`{inviter:username}`, inviterObj?.username ?? "System");
+  msg = msg.replace(`{inviter:discriminator}`, inviterObj?.discriminator ?? "#0000");
+  msg = msg.replace(`{inviter:tag}`, inviterObj?.tag ?? "System#0000");
+  msg = msg.replace(`{inviter:mention}`, inviterObj ? `<@${inviterObj.id}>` : "System");
+  msg = msg.replace(`{inviter:invites}`, inviteCount ?? "∞");
+  msg = msg.replace(`{inviter:invites:left}`, leftCount ?? "∞");
+
+  // Guild tokens
+  msg = msg.replace(`{guild:name}`, member.guild.name);
+  msg = msg.replace(`{guild:members}`, member.guild.memberCount);
+
+  return msg;
+}
+
 module.exports = async (client, member, invite, inviter) => {
-  const messageData = await messages.findOne({ Guild: member.guild.id });
+  const [messageData, channelData] = await Promise.all([
+    messages.findOne({ Guild: member.guild.id }),
+    welcomeSchema.findOne({ Guild: member.guild.id }),
+  ]);
+
+  const welcomeChannel = channelData
+    ? member.guild.channels.cache.get(channelData.Channel)
+    : null;
 
   if (!invite || !inviter) {
+    // Unknown inviter (joined via vanity, discovery, etc.)
     if (messageData && messageData.inviteJoin) {
-      var joinMessage = messageData.inviteJoin;
-      joinMessage = joinMessage.replace(
-        `{user:username}`,
-        member.user.username
-      );
-      joinMessage = joinMessage.replace(
-        `{user:discriminator}`,
-        member.user.discriminator
-      );
-      joinMessage = joinMessage.replace(`{user:tag}`, member.user.tag);
-      joinMessage = joinMessage.replace(`{user:mention}`, member);
-
-      joinMessage = joinMessage.replace(`{inviter:username}`, "System");
-      joinMessage = joinMessage.replace(`{inviter:discriminator}`, "#0000");
-      joinMessage = joinMessage.replace(`{inviter:tag}`, "System#0000");
-      joinMessage = joinMessage.replace(`{inviter:mention}`, "System");
-      joinMessage = joinMessage.replace(`{inviter:invites}`, "∞");
-      joinMessage = joinMessage.replace(`{inviter:invites:left}`, "∞");
-
-      joinMessage = joinMessage.replace(`{guild:name}`, member.guild.name);
-      joinMessage = joinMessage.replace(
-        `{guild:members}`,
-        member.guild.memberCount
-      );
-
-      try {
-        const channelData = await welcomeSchema.findOne({
-          Guild: member.guild.id,
-        });
-        if (channelData) {
-          var channel = member.guild.channels.cache.get(channelData.Channel);
-
-          await client
-            .embed(
-              {
-                title: `👋・Welcome`,
-                desc: joinMessage,
-              },
-              channel
-            )
-            .catch(() => {});
-        }
-      } catch (err) {
-        console.error("Error sending welcome message:", err);
-      }
+      const msg = buildMessage(messageData.inviteJoin, member, null, "∞", "∞");
+      await sendWelcome(welcomeChannel, msg);
     } else {
-      try {
-        const channelData = await welcomeSchema.findOne({
-          Guild: member.guild.id,
-        });
-        if (channelData) {
-          var channel = member.guild.channels.cache.get(channelData.Channel);
-
-          client
-            .embed(
-              {
-                title: `👋・Welcome`,
-                desc: `I cannot trace how **${member} | ${member.user.tag}** has been joined`,
-              },
-              channel
-            )
-            .catch(() => {});
-        }
-      } catch (err) {
-        console.error("Error sending welcome message:", err);
-      }
+      await sendWelcome(
+        welcomeChannel,
+        `I cannot trace how **${member} | ${member.user.tag}** joined.`
+      );
     }
   } else {
-    const data = await invites.findOne({
-      Guild: member.guild.id,
-      User: inviter.id,
-    });
+    // Known inviter — update invite count in DB
+    let data = await invites.findOne({ Guild: member.guild.id, User: inviter.id });
 
     if (data) {
       data.Invites += 1;
       data.Total += 1;
-      data.save();
-
-      if (messageData) {
-        var joinMessage = messageData.inviteJoin;
-        joinMessage = joinMessage.replace(
-          `{user:username}`,
-          member.user.username
-        );
-        joinMessage = joinMessage.replace(
-          `{user:discriminator}`,
-          member.user.discriminator
-        );
-        joinMessage = joinMessage.replace(`{user:tag}`, member.user.tag);
-        joinMessage = joinMessage.replace(`{user:mention}`, member);
-
-        joinMessage = joinMessage.replace(
-          `{inviter:username}`,
-          inviter.username
-        );
-        joinMessage = joinMessage.replace(
-          `{inviter:discriminator}`,
-          inviter.discriminator
-        );
-        joinMessage = joinMessage.replace(`{inviter:tag}`, inviter.tag);
-        joinMessage = joinMessage.replace(`{inviter:mention}`, inviter);
-        joinMessage = joinMessage.replace(`{inviter:invites}`, data.Invites);
-        joinMessage = joinMessage.replace(`{inviter:invites:left}`, data.Left);
-
-        joinMessage = joinMessage.replace(`{guild:name}`, member.guild.name);
-        joinMessage = joinMessage.replace(
-          `{guild:members}`,
-          member.guild.memberCount
-        );
-
-        try {
-          const channelData = await welcomeSchema.findOne({
-            Guild: member.guild.id,
-          });
-          if (channelData) {
-            var channel = member.guild.channels.cache.get(channelData.Channel);
-
-            await client
-              .embed(
-                {
-                  title: `👋・Welcome`,
-                  desc: joinMessage,
-                },
-                channel
-              )
-              .catch(() => {});
-          }
-        } catch (err) {
-          console.error("Error sending welcome message:", err);
-        }
-      } else {
-        try {
-          const channelData = await welcomeSchema.findOne({
-            Guild: member.guild.id,
-          });
-          if (channelData) {
-            var channel = member.guild.channels.cache.get(channelData.Channel);
-
-            client.embed(
-              {
-                title: `👋・Welcome`,
-                desc: `**${member} | ${member.user.tag}** was invited by ${inviter.tag} **(${data.Invites} invites)**`,
-              },
-              channel
-            );
-          }
-        } catch (err) {
-          console.error("Error sending welcome message:", err);
-        }
-      }
-
-      try {
-        const rewardData = await rewards.findOne({
-          Guild: member.guild.id,
-          Invites: data.Invites,
-        });
-        if (rewardData) {
-          try {
-            var role = member.guild.roles.cache.get(rewardData.Role);
-            member.roles.add(role);
-          } catch {}
-        }
-      } catch (err) {
-        console.error("Error checking invite rewards:", err);
-      }
+      await data.save();
     } else {
-      new invites({
+      data = await new invites({
         Guild: member.guild.id,
         User: inviter.id,
         Invites: 1,
         Total: 1,
         Left: 0,
       }).save();
-
-      if (messageData) {
-        var joinMessage = messageData.inviteJoin;
-        joinMessage = joinMessage.replace(
-          `{user:username}`,
-          member.user.username
-        );
-        joinMessage = joinMessage.replace(
-          `{user:discriminator}`,
-          member.user.discriminator
-        );
-        joinMessage = joinMessage.replace(`{user:tag}`, member.user.tag);
-        joinMessage = joinMessage.replace(`{user:mention}`, member);
-
-        joinMessage = joinMessage.replace(
-          `{inviter:username}`,
-          inviter.username
-        );
-        joinMessage = joinMessage.replace(
-          `{inviter:discriminator}`,
-          inviter.discriminator
-        );
-        joinMessage = joinMessage.replace(`{inviter:tag}`, inviter.tag);
-        joinMessage = joinMessage.replace(`{inviter:mention}`, inviter);
-        joinMessage = joinMessage.replace(`{inviter:invites}`, "1");
-        joinMessage = joinMessage.replace(`{inviter:invites:left}`, "0");
-
-        joinMessage = joinMessage.replace(`{guild:name}`, member.guild.name);
-        joinMessage = joinMessage.replace(
-          `{guild:members}`,
-          member.guild.memberCount
-        );
-
-        try {
-          const channelData = await welcomeSchema.findOne({
-            Guild: member.guild.id,
-          });
-          if (channelData) {
-            var channel = member.guild.channels.cache.get(channelData.Channel);
-
-            await client
-              .embed(
-                {
-                  title: `👋・Welcome`,
-                  desc: joinMessage,
-                },
-                channel
-              )
-              .catch(() => {});
-          }
-        } catch (err) {
-          console.error("Error sending welcome message:", err);
-        }
-      } else {
-        try {
-          const channelData = await welcomeSchema.findOne({
-            Guild: member.guild.id,
-          });
-          if (channelData) {
-            var channel = member.guild.channels.cache.get(channelData.Channel);
-
-            await client
-              .embed(
-                {
-                  title: `👋・Welcome`,
-                  desc: `**${member} | ${member.user.tag}** was invited by ${inviter.tag} **(1 invites)**`,
-                },
-                channel
-              )
-              .catch(() => {});
-          }
-        } catch (err) {
-          console.error("Error sending welcome message:", err);
-        }
-      }
     }
 
+    const currentInvites = data.Invites;
+    const currentLeft = data.Left;
+
+    if (messageData && messageData.inviteJoin) {
+      const msg = buildMessage(
+        messageData.inviteJoin,
+        member,
+        inviter,
+        currentInvites,
+        currentLeft
+      );
+      await sendWelcome(welcomeChannel, msg);
+    } else {
+      await sendWelcome(
+        welcomeChannel,
+        `**${member} | ${member.user.tag}** was invited by **${inviter.tag}** **(${currentInvites} invites)**`
+      );
+    }
+
+    // Check invite rewards
+    try {
+      const rewardData = await rewards.findOne({
+        Guild: member.guild.id,
+        Invites: currentInvites,
+      });
+      if (rewardData) {
+        const role = member.guild.roles.cache.get(rewardData.Role);
+        if (role) member.roles.add(role).catch(() => {});
+      }
+    } catch (err) {
+      console.error("Error checking invite rewards:", err);
+    }
+
+    // Track who invited whom
     try {
       const data2 = await invitedBy.findOne({ Guild: member.guild.id });
       if (data2) {
