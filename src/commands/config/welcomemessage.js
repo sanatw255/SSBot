@@ -72,14 +72,13 @@ module.exports = async (client, interaction, args) => {
       const data = await inviteMessages.findOne({
         Guild: interaction.guild.id,
       });
+      // Replace \n with actual line breaks
+      const processedMessage = message.replace(/\\n/g, "\n");
+
       if (data) {
-        // Replace \n with actual line breaks
-        const processedMessage = message.replace(/\\n/g, "\n");
         data.inviteJoin = processedMessage;
         await data.save();
       } else {
-        // Replace \n with actual line breaks
-        const processedMessage = message.replace(/\\n/g, "\n");
         await new inviteMessages({
           Guild: interaction.guild.id,
           inviteJoin: processedMessage,
@@ -92,7 +91,7 @@ module.exports = async (client, interaction, args) => {
           fields: [
             {
               name: `💬┆Message`,
-              value: `${message}`,
+              value: `${processedMessage}`,
               inline: true,
             },
           ],
