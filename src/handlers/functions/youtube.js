@@ -1,5 +1,11 @@
 const axios = require('axios');
+const { EmbedBuilder } = require('discord.js');
 const YoutubeSubscription = require('../../database/models/youtubeSubscriptions');
+
+// YouTube brand red color
+const YT_RED = '#FF0000';
+// YouTube logo for the footer (a reliable CDN-hosted icon)
+const YT_ICON = 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/YouTube_full-color_icon_%282017%29.svg/512px-YouTube_full-color_icon_%282017%29.svg.png';
 
 // Parse the latest video from a YouTube RSS feed (no API key needed)
 async function fetchLatestVideo(youtubeChannelId) {
@@ -13,27 +19,72 @@ async function fetchLatestVideo(youtubeChannelId) {
 
     const entry = entryMatch[1];
 
-    const videoIdMatch = entry.match(/<yt:videoId>(.*?)<\/yt:videoId>/);
-    const titleMatch = entry.match(/<title>(.*?)<\/title>/);
-    const linkMatch = entry.match(/<link rel="alternate" href="(.*?)"/);
+    const videoIdMatch   = entry.match(/<yt:videoId>(.*?)<\/yt:videoId>/);
+    const titleMatch     = entry.match(/<title>(.*?)<\/title>/);
+    const linkMatch      = entry.match(/<link rel="alternate" href="(.*?)"/);
     const thumbnailMatch = entry.match(/<media:thumbnail url="(.*?)"/);
-    const authorMatch = xml.match(/<author>\s*<name>(.*?)<\/name>/);
-    const descMatch = entry.match(/<media:description>([\s\S]*?)<\/media:description>/);
+    const authorMatch    = xml.match(/<author>\s*<name>(.*?)<\/name>/);
+    const descMatch      = entry.match(/<media:description>([\s\S]*?)<\/media:description>/);
+    const publishedMatch = entry.match(/<published>(.*?)<\/published>/);
 
     if (!videoIdMatch || !titleMatch) return null;
 
+    const videoId = videoIdMatch[1].trim();
+
     return {
-        videoId: videoIdMatch[1].trim(),
-        title: titleMatch[1].trim(),
-        url: linkMatch ? linkMatch[1].trim() : `https://www.youtube.com/watch?v=${videoIdMatch[1].trim()}`,
-        thumbnail: thumbnailMatch ? thumbnailMatch[1].trim() : null,
-        author: authorMatch ? authorMatch[1].trim() : 'Unknown',
-        description: descMatch ? descMatch[1].trim().slice(0, 200) : '',
+        videoId,
+        title:       titleMatch[1].trim(),
+        url:         linkMatch ? linkMatch[1].trim() : `https://www.youtube.com/watch?v=${videoId}`,
+        thumbnail:   thumbnailMatch ? thumbnailMatch[1].trim() : null,
+        author:      authorMatch ? authorMatch[1].trim() : 'Unknown',
+        description: descMatch ? descMatch[1].trim() : '',
+        publishedAt: publishedMatch ? new Date(publishedMatch[1].trim()) : new Date(),
     };
 }
 
+// Build the Pingcord-accurate embed
+function buildEmbed(latest) {
+    // Format publish date like Pingcord: "6/10/26, 19:59"
+    const dateStr = latest.publishedAt.toLocaleString('en-US', {
+        month:  'numeric',
+        day:    'numeric',
+        year:   '2-digit',
+        hour:   '2-digit',
+        minute: '2-digit',
+        hour12: false,
+    });
+
+    // Truncate description to ~200 chars, just like Pingcord shows it
+    let desc = latest.description.trim();
+    if (desc.length > 200) desc = desc.slice(0, 200) + '...';
+
+    const embed = new EmbedBuilder()
+        .setColor(YT_RED)
+        // Author line = channel name (Pingcord uses channel name here)
+        .setAuthor({ name: latest.author })
+        // Title = video title, linked to the video
+        .setTitle(latest.title)
+        .setURL(latest.url)
+        // Description mimics Pingcord: "[Channel] published a video on YouTube!" + optional desc
+        .setDescription(
+            `**${latest.author}** published a video on YouTube!` +
+            (desc ? `\n\n**Description**\n${desc}` : '')
+        )
+        // Large video thumbnail, just like Pingcord
+        .setFooter({
+            text: `YouTube • ${dateStr}`,
+            iconURL: YT_ICON,
+        })
+        .setTimestamp(latest.publishedAt);
+
+    if (latest.thumbnail) embed.setImage(latest.thumbnail);
+
+    return embed;
+}
+
 module.exports = (client) => {
-    const POLL_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+    // ─── Poll every 2 minutes for near-instant notifications ───────────────────
+    const POLL_INTERVAL_MS = 1 * 60 * 1000; // 1 minute
 
     const checkYoutube = async () => {
         try {
@@ -45,53 +96,38 @@ module.exports = (client) => {
                     const latest = await fetchLatestVideo(sub.YoutubeChannelId);
                     if (!latest) continue;
 
-                    // Skip if this is the same video we already notified about
+                    // Same video as last time — nothing to do
                     if (sub.LastVideoId === latest.videoId) continue;
 
-                    // First time seeing this channel — just store the ID, don't ping
+                    // First run — seed the LastVideoId silently, no ping
                     if (!sub.LastVideoId) {
                         sub.LastVideoId = latest.videoId;
                         await sub.save();
                         continue;
                     }
 
-                    // New video detected! Find the guild and channel
+                    // ── New video detected! ──────────────────────────────────────
                     const guild = client.guilds.cache.get(sub.Guild);
                     if (!guild) continue;
 
                     const channel = guild.channels.cache.get(sub.DiscordChannelId);
                     if (!channel) continue;
 
-                    // Build the rich embed (Pingcord-style)
-                    const { EmbedBuilder } = require('discord.js');
-                    const embed = new EmbedBuilder()
-                        .setColor('#FF0000')
-                        .setAuthor({ name: latest.author })
-                        .setTitle(latest.title)
-                        .setURL(latest.url)
-                        .setDescription(
-                            latest.description
-                                ? `${latest.description}${latest.description.length >= 200 ? '...' : ''}`
-                                : `${latest.author} published a video on YouTube!`
-                        )
-                        .setFooter({ text: `YouTube • ${new Date().toLocaleString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`, iconURL: 'https://www.iconpacks.net/icons/2/free-youtube-logo-icon-2431-thumb.png' })
-                        .setTimestamp();
+                    const embed = buildEmbed(latest);
 
-                    if (latest.thumbnail) embed.setImage(latest.thumbnail);
-
-                    // Send @everyone ping + embed
+                    // Send the @everyone text + Pingcord-style embed
                     await channel.send({
                         content: `@everyone **${latest.author}** just uploaded **${latest.title}** at ${latest.url}!!`,
                         embeds: [embed],
                         allowedMentions: { parse: ['everyone'] },
                     });
 
-                    // Update the last seen video ID
+                    // Save new LastVideoId so we don't ping again
                     sub.LastVideoId = latest.videoId;
                     await sub.save();
 
                 } catch (err) {
-                    // Silently skip broken subscriptions (deleted channels, network errors, etc.)
+                    // Skip broken subscriptions (deleted channel, network error, etc.)
                     console.error(`[YouTube] Error checking channel ${sub.YoutubeChannelId}:`, err.message);
                 }
             }
@@ -100,7 +136,7 @@ module.exports = (client) => {
         }
     };
 
-    // Initial check then recurring interval
+    // Run immediately on startup, then every 2 minutes
     checkYoutube();
     setInterval(checkYoutube, POLL_INTERVAL_MS);
 };
