@@ -20,7 +20,7 @@ module.exports = {
                         .setName('notify')
                         .setDescription('The Discord channel to send upload notifications in')
                         .setRequired(true)
-                        .addChannelTypes(ChannelType.GuildText)
+                        .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
                 )
         )
         .addSubcommand(subcommand =>
