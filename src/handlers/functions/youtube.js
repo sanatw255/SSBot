@@ -84,7 +84,7 @@ function buildEmbed(latest) {
 
 module.exports = (client) => {
     // ─── Poll every 2 minutes for near-instant notifications ───────────────────
-    const POLL_INTERVAL_MS = 1 * 60 * 1000; // 1 minute
+    const POLL_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
 
     const checkYoutube = async () => {
         try {
@@ -117,7 +117,7 @@ module.exports = (client) => {
 
                     // Send the @everyone text + Pingcord-style embed
                     await channel.send({
-                        content: `@everyone **${latest.author}** just uploaded **${latest.title}** at ${latest.url}!!`,
+                        content: `@everyone **${latest.author}** just uploaded **${latest.title}** at ${latest.url}`,
                         embeds: [embed],
                         allowedMentions: { parse: ['everyone'] },
                     });
