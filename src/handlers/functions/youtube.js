@@ -83,8 +83,14 @@ function buildEmbed(latest) {
 }
 
 module.exports = (client) => {
-    // ─── Poll every 2 minutes for near-instant notifications ───────────────────
-    const POLL_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
+    // ─── CRITICAL: Only run on shard 0 ─────────────────────────────────────────
+    // The handler loader in bot.js runs this file on EVERY shard. Without this
+    // guard, every shard polls YouTube independently at the same time, causing
+    // duplicate notifications (one per shard) for every new video.
+    if (client.shard && client.shard.ids[0] !== 0) return;
+
+    // ─── Poll every 1 minute for near-instant notifications ────────────────────
+    const POLL_INTERVAL_MS = 1 * 60 * 1000; // 1 minutes
 
     const checkYoutube = async () => {
         try {
