@@ -2,18 +2,17 @@ const axios = require('axios');
 const { EmbedBuilder } = require('discord.js');
 const YoutubeSubscription = require('../../database/models/youtubeSubscriptions');
 
-// YouTube brand red color
-const YT_RED = '#FF0000';
-// YouTube logo for the footer (a reliable CDN-hosted icon)
+const YT_RED  = '#FF0000';
 const YT_ICON = 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/YouTube_full-color_icon_%282017%29.svg/512px-YouTube_full-color_icon_%282017%29.svg.png';
 
-// Parse the latest video from a YouTube RSS feed (no API key needed)
+// ─── RSS Helpers ────────────────────────────────────────────────────────────
+
+// Fetch the single latest video entry from a YouTube RSS feed
 async function fetchLatestVideo(youtubeChannelId) {
     const url = `https://www.youtube.com/feeds/videos.xml?channel_id=${youtubeChannelId}`;
     const res = await axios.get(url, { timeout: 10000 });
     const xml = res.data;
 
-    // Pull the first <entry> block (latest video)
     const entryMatch = xml.match(/<entry>([\s\S]*?)<\/entry>/);
     if (!entryMatch) return null;
 
@@ -30,7 +29,6 @@ async function fetchLatestVideo(youtubeChannelId) {
     if (!videoIdMatch || !titleMatch) return null;
 
     const videoId = videoIdMatch[1].trim();
-
     return {
         videoId,
         title:       titleMatch[1].trim(),
@@ -42,55 +40,49 @@ async function fetchLatestVideo(youtubeChannelId) {
     };
 }
 
-// Build the Pingcord-accurate embed
+// Fetch ALL video IDs currently in the RSS feed (used for first-run seeding)
+async function fetchAllVideoIds(youtubeChannelId) {
+    const url = `https://www.youtube.com/feeds/videos.xml?channel_id=${youtubeChannelId}`;
+    const res = await axios.get(url, { timeout: 10000 });
+    const matches = [...res.data.matchAll(/<yt:videoId>(.*?)<\/yt:videoId>/g)];
+    return matches.map(m => m[1].trim());
+}
+
+// ─── Embed Builder ───────────────────────────────────────────────────────────
+
 function buildEmbed(latest) {
-    // Format publish date like Pingcord: "6/10/26, 19:59"
     const dateStr = latest.publishedAt.toLocaleString('en-US', {
-        month:  'numeric',
-        day:    'numeric',
-        year:   '2-digit',
-        hour:   '2-digit',
-        minute: '2-digit',
-        hour12: false,
+        month: 'numeric', day: 'numeric', year: '2-digit',
+        hour: '2-digit', minute: '2-digit', hour12: false,
     });
 
-    // Truncate description to ~200 chars, just like Pingcord shows it
     let desc = latest.description.trim();
     if (desc.length > 200) desc = desc.slice(0, 200) + '...';
 
     const embed = new EmbedBuilder()
         .setColor(YT_RED)
-        // Author line = channel name (Pingcord uses channel name here)
         .setAuthor({ name: latest.author })
-        // Title = video title, linked to the video
         .setTitle(latest.title)
         .setURL(latest.url)
-        // Description mimics Pingcord: "[Channel] published a video on YouTube!" + optional desc
         .setDescription(
             `**${latest.author}** published a video on YouTube!` +
             (desc ? `\n\n**Description**\n${desc}` : '')
         )
-        // Large video thumbnail, just like Pingcord
-        .setFooter({
-            text: `YouTube • ${dateStr}`,
-            iconURL: YT_ICON,
-        })
+        .setFooter({ text: `YouTube • ${dateStr}`, iconURL: YT_ICON })
         .setTimestamp(latest.publishedAt);
 
     if (latest.thumbnail) embed.setImage(latest.thumbnail);
-
     return embed;
 }
 
+// ─── Poller ──────────────────────────────────────────────────────────────────
+
 module.exports = (client) => {
-    // ─── CRITICAL: Only run on shard 0 ─────────────────────────────────────────
-    // The handler loader in bot.js runs this file on EVERY shard. Without this
-    // guard, every shard polls YouTube independently at the same time, causing
-    // duplicate notifications (one per shard) for every new video.
+    // CRITICAL: Only run on shard 0 to prevent duplicate notifications.
+    // The handler loader in bot.js runs this file on EVERY shard simultaneously.
     if (client.shard && client.shard.ids[0] !== 0) return;
 
-    // ─── Poll every 1 minute for near-instant notifications ────────────────────
-    const POLL_INTERVAL_MS = 1 * 60 * 1000; // 1 minutes
+    const POLL_INTERVAL_MS = 1 * 60 * 1000; // 1 minute
 
     const checkYoutube = async () => {
         try {
@@ -99,42 +91,48 @@ module.exports = (client) => {
 
             for (const sub of subscriptions) {
                 try {
-                    const latest = await fetchLatestVideo(sub.YoutubeChannelId);
-                    if (!latest) continue;
-
-                    // Same video as last time — nothing to do
-                    if (sub.LastVideoId === latest.videoId) continue;
-
-                    // First run — seed the LastVideoId silently, no ping
-                    if (!sub.LastVideoId) {
-                        sub.LastVideoId = latest.videoId;
+                    // ── First-run seeding ────────────────────────────────────
+                    // If NotifiedVideoIds is empty (new subscription OR migration
+                    // from old single-ID schema), fetch ALL current video IDs from
+                    // the RSS feed and mark them as "already notified" without
+                    // sending any pings. This prevents spam on bot restart.
+                    if (!sub.NotifiedVideoIds || sub.NotifiedVideoIds.length === 0) {
+                        const allIds = await fetchAllVideoIds(sub.YoutubeChannelId);
+                        sub.NotifiedVideoIds = allIds;
+                        sub.LastVideoId = allIds[0] || null;
                         await sub.save();
                         continue;
                     }
 
-                    // ── New video detected! ──────────────────────────────────────
+                    const latest = await fetchLatestVideo(sub.YoutubeChannelId);
+                    if (!latest) continue;
+
+                    // ── Duplicate guard ──────────────────────────────────────
+                    // This is the core fix. Once a video ID is in NotifiedVideoIds,
+                    // it will NEVER trigger a notification again — no matter how
+                    // many times YouTube's CDN serves it as "latest" in the RSS feed.
+                    if (sub.NotifiedVideoIds.includes(latest.videoId)) continue;
+
+                    // ── New video! Send notification ─────────────────────────
                     const guild = client.guilds.cache.get(sub.Guild);
                     if (!guild) continue;
 
                     const channel = guild.channels.cache.get(sub.DiscordChannelId);
                     if (!channel) continue;
 
-                    const embed = buildEmbed(latest);
-
-                    // Send the @everyone text + Pingcord-style embed
                     await channel.send({
-                        content: `@everyone **${latest.author}** just uploaded **${latest.title}** at ${latest.url}`,
-                        embeds: [embed],
+                        content: `@everyone **${latest.author}** just uploaded **${latest.title}** at ${latest.url}!!`,
+                        embeds: [buildEmbed(latest)],
                         allowedMentions: { parse: ['everyone'] },
                     });
 
-                    // Save new LastVideoId so we don't ping again
+                    // Add to the notified set. Cap at 50 to prevent unbounded growth.
+                    sub.NotifiedVideoIds = [...sub.NotifiedVideoIds, latest.videoId].slice(-50);
                     sub.LastVideoId = latest.videoId;
                     await sub.save();
 
                 } catch (err) {
-                    // Skip broken subscriptions (deleted channel, network error, etc.)
-                    console.error(`[YouTube] Error checking channel ${sub.YoutubeChannelId}:`, err.message);
+                    console.error(`[YouTube] Error on channel ${sub.YoutubeChannelId}:`, err.message);
                 }
             }
         } catch (err) {
@@ -142,7 +140,6 @@ module.exports = (client) => {
         }
     };
 
-    // Run immediately on startup, then every 2 minutes
     checkYoutube();
     setInterval(checkYoutube, POLL_INTERVAL_MS);
 };
